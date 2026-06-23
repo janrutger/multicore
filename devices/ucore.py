@@ -20,22 +20,22 @@ class Ucore:
 
 
         self.ucode = {}
-        self.ucode['ldv']   = ['load',  'setResult']                        # Loads  the value in self.transfer in self.value
-        self.ucode['stv']   = ['store', 'setResult']                        # Stores the value in self.value in self.fransfer
+        self.ucode['ldv']   = ['mv_tv',  'setResult']                        # mv_tvs  the value in self.transfer in self.value
+        self.ucode['stv']   = ['mv_vt', 'setResult']                        # mv_vts the value in self.value in self.fransfer
         self.ucode['status']= ['status','setResult']
 
-        self.ucode['add']   = ['validA', 'validB', 'add', 'setResult']
-        self.ucode['sub']   = ['validA', 'validB', 'sub', 'setResult']
-        self.ucode['mul']   = ['validA', 'validB', 'mul', 'setResult']
-        self.ucode['div']   = ['validA', 'validB', 'div', 'setResult']
+        self.ucode['add']   = ['valid_v', 'valid_w', 'add', 'setResult']
+        self.ucode['sub']   = ['valid_v', 'valid_w', 'sub', 'setResult']
+        self.ucode['mul']   = ['valid_v', 'valid_w', 'mul', 'setResult']
+        self.ucode['div']   = ['valid_v', 'valid_w', 'div', 'setResult']
 
-        self.ucode['tstz']  = ['validA', 'tstz', 'setResult']               # V is zero
-        self.ucode['tstn']  = ['validA', 'tstn', 'setResult']               # V is negative
+        self.ucode['tstz']  = ['valid_v', 'tstz', 'setResult']               # V is zero
+        self.ucode['tstn']  = ['valid_v', 'tstn', 'setResult']               # V is negative
 
-        self.ucode['cmpe']  = ['validA', 'validB', 'cmpe',  'setResult']    # V W Equal
-        self.ucode['cmpne'] = ['validA', 'validB', 'cmpne', 'setResult']    # V W NotEqual
-        self.ucode['cmpgt'] = ['validA', 'validB', 'cmpgt', 'setResult']    # V W GreaterThen
-        self.ucode['cmplt'] = ['validA', 'validB', 'cmplt', 'setResult']    # V W LessThen
+        self.ucode['cmpe']  = ['valid_v', 'valid_w', 'cmpe',  'setResult']    # V W Equal
+        self.ucode['cmpne'] = ['valid_v', 'valid_w', 'cmpne', 'setResult']    # V W NotEqual
+        self.ucode['cmpgt'] = ['valid_v', 'valid_w', 'cmpgt', 'setResult']    # V W GreaterThen
+        self.ucode['cmplt'] = ['valid_v', 'valid_w', 'cmplt', 'setResult']    # V W LessThen
 
 
     def initCoreMatrix(self, matrix):
@@ -55,15 +55,24 @@ class Ucore:
         if self.coreStatus != 'WORKING':               # check if the core is active
             return
         
-        ucode        = self.ucode[self.instruction]    # get the current ucode sequence
-        uinstruction = ucode[self.upc]                 # get the current ucode instruction
+        # Haal de huidige instructie op
+        ucode        = self.ucode[self.instruction]    
+        current_uinst = ucode[self.upc]                 
+
+        # Splits op in opcode en operand
+        if isinstance(current_uinst, tuple):
+            uinstruction, uoperand = current_uinst
+        else:
+            uinstruction, uoperand = current_uinst, None
+
+        
 
         # --- CPU <-> CORE DIRECT I/O ---
-        if uinstruction == 'load':
+        if uinstruction == 'mv_tv':
             self.value = self.transfer
             self.upc += 1
 
-        elif uinstruction == 'store':
+        elif uinstruction == 'mv_vt':
             self.transfer = self.value
             self.upc += 1
 
@@ -72,14 +81,14 @@ class Ucore:
             self.upc += 1
 
         # --- BUS DATA-DESK (Wachten op andere cores) ---
-        elif uinstruction == 'validA':
+        elif uinstruction == 'valid_v':
             # arg1 is het ID van de bron-core. Check of die al VALID is
             if self.matrix[self.arg1].coreStatus == 'VALID':
                 self.value = self.matrix[self.arg1].value
                 self.matrix[self.arg1].coreStatus = 'IDLE'
                 self.upc += 1  # Alleen door naar de volgende stap als de data er is!
 
-        elif uinstruction == 'validB':
+        elif uinstruction == 'valid_w':
             # arg2 is het ID van de bron-core. Check of die al VALID is
             if self.matrix[self.arg2].coreStatus == 'VALID':
                 self.work = self.matrix[self.arg2].value
@@ -126,6 +135,18 @@ class Ucore:
         elif uinstruction == 'cmplt':
             self.status = (self.value < self.work)
             self.upc += 1
+
+        # --- MICRO BRANCHING LOGICA ---
+        elif uinstruction == 'bra_always':
+            self.upc += uoperand  # Overschrijf de upc direct met het doeladres
+            return                # Zorg dat de upc += 1 aan het einde wordt overgeslagen!
+
+        elif uinstruction == 'bra_false':
+            if not self.status:  # Als de test False heeft opgeleverd
+                self.upc += uoperand
+                return
+            else:
+                self.upc += 1    # Conditie niet waar? Loop gewoon door naar de volgende stap
 
         # --- AFRONDING EN PUBLICATIE ---
         elif uinstruction == 'setResult':

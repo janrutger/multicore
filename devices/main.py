@@ -16,7 +16,7 @@ def run_test():
     # Je volledige programma, nu super leesbaar met labels!
     assembly_program = """
     LDI  A, 0        ; Laad accumulator A met 42
-    LDI  B, 42       ; Laad register B met 42
+    LDI  B, 100      ; Laad register B met 42
     LDI  C, 1
     TEST:
         TSTE A, B          ; Vergelijk Register A en Register B
@@ -46,7 +46,7 @@ def run_test():
     cpu.memory.memWrite(55, adres=20)
 
     # 4. Start de klok-lus (Clock Cycles)
-    max_ticks = 10000  # We kunnen dit nu gerust hoger zetten als veiligheidsmarge
+    max_ticks = 1000000  # We kunnen dit nu gerust hoger zetten als veiligheidsmarge
     for tick_count in range(1, max_ticks + 1):
         current_state = cpu.cpu_state
         current_pc = cpu.PC
