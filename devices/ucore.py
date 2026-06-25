@@ -1,5 +1,72 @@
 # Multicore/devices/ucore.py
+"""
+===============================================================================
+                       MICROPROGRAMMERING GIDS VOOR DE UCORE
+===============================================================================
 
+De Ucore is een minimalistische, asynchrone execution unit binnen de STERN-matrix.
+In plaats van een grote traditionele registerset, programmeer je de Ucore direct
+op microcode-niveau (`self.ucode`) met behulp van drie interne registers, een 
+status-vlag en dedicated hardware-registers voor signed arithmetic (teken-bewustzijn).
+
+1. DE INTERNE ARCHITECTUUR (REGISTERS)
+--------------------------------------
+* `V` (Value)   : De primaire invoer/uitvoer voor data en buren-communicatie.
+* `W` (Work)    : De secundaire invoer voor ALU-operaties (rekenwerk).
+* `T` (Transfer): De accumulator waar tussenstanden en loops in worden opgebouwd.
+* `Status`      : Een boolean vlag (True/False) die het resultaat van tests bevat.
+* `sign_v / sign_w` : Interne hardware-latches die het oorspronkelijke teken (+/-)
+                      van de invoerdata onthouden voor signed operaties.
+
+2. INSTRUCTIE-SYNTAX & SYSTEMATIEK
+----------------------------------
+Micro-instructies worden opeenvolgend uitgevoerd via de interne micro-PC (`upc`).
+Instructies kunnen een platte string zijn, of een tuple `(instructie, operand)`
+wanneer er een sprong-offset (micro-branch) nodig is.
+
+Datatransport gebruikt de strikte systematiek: `mv_[bron][doel]`
+* `mv_tv` : Kopieer data van Transfer (T) naar Value (V).
+* `mv_vt` : Kopieer data van Value    (V) naar Transfer (T).
+* `mv_wt` : Kopieer data van Work     (W) naar Transfer (T).
+* `mv_vw` : Kopieer data van Value    (V) naar Work     (W).
+* `mv_tw` : Kopieer data van Transfer (T) naar Work     (W).
+
+3. MICROCODE INSTRUCTIESET
+--------------------------
+De decoder ondersteunt de volgende low-level operaties:
+
+AANSTURING & SYNCHRONISATIE:
+* `valid_v`   : Blokkeer de core (stall) tot Arg1/A geldig is. Slaat het teken op.
+* `valid_w`   : Blokkeer de core (stall) tot Arg2/B geldig is. Slaat het teken op.
+* `setResult` : Activeert de output-fase: zet coreStatus op 'VALID'.
+
+ALU / REKENWERK (DIRECT EN INDIRECT):
+* `add` / `sub` / `mul` / `div` : Voer operatie uit op V en W, sla op in V.
+* `clr_t`     : Reset de accumulator (`T = 0`).
+* `dec_v`     : Verlaag de teller direct met één (`V = V - 1`).
+* `add_tw`    : Accumuleer: tel de waarde van Work op bij Transfer (`T = T + W`).
+
+SIGNED OPERATIONS (TEKEN-LOGICA):
+* `abs_v`     : Maak de waarde in V absoluut (`V = abs(V)`).
+* `abs_w`     : Maak de waarde in W absoluut (`W = abs(W)`).
+* `sign_vxor` : Pas het correcte eindteken toe op basis van vermenigvuldigings-
+                wetten: als `sign_v != sign_w`, wordt V negatief (`V = -abs(V)`).
+
+TESTS (BEÏNVLOEDEN DE self.status VLAG):
+* `tstz`      : Controleer of V nul is (`V == 0`).
+* `tstn`      : Controleer of V negatief is (`V < 0`).
+* `cmplt`     : Controleer of V kleiner is dan W (`V < W`).
+* `cmpe` / `cmpne` / `cmpgt` : Traditionele vergelijkingen tussen V en W.
+
+MICRO-BRANCHING (SPRONG-LOGICA):
+* `bra_always`: Spring direct met de opgegeven relatieve operand-offset.
+* `bra_true`  : Spring alleen als `self.status` WAAR (True) is.
+* `bra_false` : Spring alleen als `self.status` ONWAAR (False) is.
+
+===============================================================================
+"""
+
+from opcodes import MICROCODE_ROM
 
 class Ucore:
     def __init__(self):
@@ -17,25 +84,11 @@ class Ucore:
         self.arg1 = None                # Ucore ID
         self.arg2 = None                # Ucore ID
 
+        self.sign_v = False  # Onthoudt of de originele V negatief was
+        self.sign_w = False  # Onthoudt of de originele W negatief was
 
-
-        self.ucode = {}
-        self.ucode['ldv']   = ['mv_tv',  'setResult']                        # mv_tvs  the value in self.transfer in self.value
-        self.ucode['stv']   = ['mv_vt', 'setResult']                        # mv_vts the value in self.value in self.fransfer
-        self.ucode['status']= ['status','setResult']
-
-        self.ucode['add']   = ['valid_v', 'valid_w', 'add', 'setResult']
-        self.ucode['sub']   = ['valid_v', 'valid_w', 'sub', 'setResult']
-        self.ucode['mul']   = ['valid_v', 'valid_w', 'mul', 'setResult']
-        self.ucode['div']   = ['valid_v', 'valid_w', 'div', 'setResult']
-
-        self.ucode['tstz']  = ['valid_v', 'tstz', 'setResult']               # V is zero
-        self.ucode['tstn']  = ['valid_v', 'tstn', 'setResult']               # V is negative
-
-        self.ucode['cmpe']  = ['valid_v', 'valid_w', 'cmpe',  'setResult']    # V W Equal
-        self.ucode['cmpne'] = ['valid_v', 'valid_w', 'cmpne', 'setResult']    # V W NotEqual
-        self.ucode['cmpgt'] = ['valid_v', 'valid_w', 'cmpgt', 'setResult']    # V W GreaterThen
-        self.ucode['cmplt'] = ['valid_v', 'valid_w', 'cmplt', 'setResult']    # V W LessThen
+        # Verwijs simpelweg naar de centrale ROM in plaats van een eigen dict bouwen!
+        self.ucode = MICROCODE_ROM
 
 
     def initCoreMatrix(self, matrix):
@@ -76,6 +129,18 @@ class Ucore:
             self.transfer = self.value
             self.upc += 1
 
+        elif uinstruction == 'mv_wt':
+            self.transfer = self.work
+            self.upc += 1
+
+        elif uinstruction == 'mv_tw':
+            self.work = self.transfer
+            self.upc += 1
+
+        elif uinstruction == 'mv_vw':
+            self.value = self.work      # Destination = Value, Source = Work
+            self.upc += 1
+
         elif uinstruction == 'status':
             self.transfer = self.status
             self.upc += 1
@@ -84,15 +149,24 @@ class Ucore:
         elif uinstruction == 'valid_v':
             # arg1 is het ID van de bron-core. Check of die al VALID is
             if self.matrix[self.arg1].coreStatus == 'VALID':
-                self.value = self.matrix[self.arg1].value
+                # self.value = self.matrix[self.arg1].value
+                # self.matrix[self.arg1].coreStatus = 'IDLE'
+                # self.upc += 1  # Alleen door naar de volgende stap als de data er is!
+                raw_val = self.matrix[self.arg1].value
+                self.sign_v = (raw_val < 0)  # HIER registreren we het teken!
+                self.value = raw_val
                 self.matrix[self.arg1].coreStatus = 'IDLE'
-                self.upc += 1  # Alleen door naar de volgende stap als de data er is!
+                self.upc += 1
 
         elif uinstruction == 'valid_w':
             # arg2 is het ID van de bron-core. Check of die al VALID is
             if self.matrix[self.arg2].coreStatus == 'VALID':
-                self.work = self.matrix[self.arg2].value
-                self.upc += 1  # Alleen door naar de volgende stap als de data er is!
+                # self.work = self.matrix[self.arg2].value
+                # self.upc += 1  # Alleen door naar de volgende stap als de data er is!
+                raw_val = self.matrix[self.arg2].value
+                self.sign_w = (raw_val < 0)  # HIER registreren we het teken!
+                self.work = raw_val
+                self.upc += 1
 
         # --- ALU REKENWERK ---
         elif uinstruction == 'add':
@@ -147,6 +221,43 @@ class Ucore:
                 return
             else:
                 self.upc += 1    # Conditie niet waar? Loop gewoon door naar de volgende stap
+
+        elif uinstruction == 'bra_true':
+            if self.status:  # Spring als de test WAAR was (bijv. V == 0)
+                self.upc += uoperand
+                return
+            else:
+                self.upc += 1
+        
+        # --- NIEUWE DIRECTE REGISTER MANIPULATIE ---
+        elif uinstruction == 'clr_t':
+            self.transfer = 0
+            self.upc += 1
+
+        elif uinstruction == 'dec_v':
+            self.value -= 1
+            self.upc += 1
+
+        elif uinstruction == 'add_tw':
+            # De pure accumulator actie: tel W op bij T
+            self.transfer = self.transfer + self.work
+            self.upc += 1
+
+        elif uinstruction == 'abs_v':
+            self.value = abs(self.value)
+            self.upc += 1
+
+        elif uinstruction == 'abs_w':
+            self.work = abs(self.work)
+            self.upc += 1
+
+        elif uinstruction == 'sign_vxor':
+            # Conditional Negate: als de originele tekens ongelijk waren, xor ze
+            if self.sign_v != self.sign_w:
+                self.value = -abs(self.value)
+            self.upc += 1
+
+        
 
         # --- AFRONDING EN PUBLICATIE ---
         elif uinstruction == 'setResult':

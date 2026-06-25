@@ -67,3 +67,55 @@ class Reg(IntEnum):
     X  = 7
     Y  = 8
     Z  = 9
+
+
+
+
+
+# ucode instructions
+
+MICROCODE_ROM = {
+    'ldv':    ['mv_tv',  'setResult'],
+    'stv':    ['mv_vt',  'setResult'],
+    'status': ['status', 'setResult'],
+
+    'add':    ['valid_v', 'valid_w', 'add', 'setResult'],
+    'sub':    ['valid_v', 'valid_w', 'sub', 'setResult'],
+    'mul':    ['valid_v', 'valid_w', 'mul', 'setResult'],
+    'div':    ['valid_v', 'valid_w', 'div', 'setResult'],
+
+    'tstz':   ['valid_v', 'tstz', 'setResult'],
+    'tstn':   ['valid_v', 'tstn', 'setResult'],
+
+    'cmpe':   ['valid_v', 'valid_w', 'cmpe',  'setResult'],
+    'cmpne':  ['valid_v', 'valid_w', 'cmpne', 'setResult'],
+    'cmpgt':  ['valid_v', 'valid_w', 'cmpgt', 'setResult'],
+    'cmplt':  ['valid_v', 'valid_w', 'cmplt', 'setResult'],
+
+   'slow_mul': [
+        'valid_v',             # 0: Wacht op A en onthoud teken
+        'valid_w',             # 1: Wacht op B en onthoud teken
+        'abs_v',               # 2: Maak V positief voor de lus
+        'abs_w',               # 3: Maak W positief voor de lus
+        
+        # --- SWAP OPTIMALISATIE ---
+        'cmplt',               # 4: Is V < W?
+        ('bra_true', 4),       # 5: JA? Sla de swap over! Spring +4 verder -> naar clr_t (index 9)
+        'mv_vt',               # 6: T = V
+        'mv_vw',               # 7: V = W (V is nu de kleinste teller!)
+        'mv_tw',               # 8: W = T (W is nu de grootste opteller!)
+        
+        # --- DE LUS ---
+        'clr_t',               # 9: T = 0 (Reset accumulator)
+        'tstz',                # 10: Is V == 0?
+        ('bra_true', 4),       # 11: JA? Lus klaar! Spring +4 verder -> naar mv_tv (index 15)
+        'add_tw',              # 12: T = T + W
+        'dec_v',               # 13: V = V - 1
+        ('bra_always', -4),    # 14: Spring -4 terug -> naar tstz (index 10)
+        
+        # --- AFRONDING ---
+        'mv_tv',               # 15: Zet het positieve resultaat uit T terug in V
+        'sign_vxor',           # 16: Pas het onthouden teken toe op V via XOR!
+        'setResult'            # 17: Meld aan de CPU dat de core VALID is
+    ]
+}

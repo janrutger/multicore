@@ -40,22 +40,85 @@ class CPU:
         # We stoppen alle Core ID's (0 t/m 15) in de vrije wachtrij
         self.free_cores = deque(range(16))
 
-    def tick(self):
-        """Voert één volledige kloksnelheid-cyclus uit voor het hele systeem."""
+    # def tick(self):
+    #     """Voert één volledige kloksnelheid-cyclus uit voor het hele systeem."""
         
-        # 1. Geef EERST alle cores in de matrix de ruimte om hun microstep te doen
-        #for core in self.cores:
-        for core_id, core in enumerate(self.cores):
-            core.tick()
+    #     # 1. Geef EERST alle cores in de matrix de ruimte om hun microstep te doen
+    #     #for core in self.cores:
+    #     for core_id, core in enumerate(self.cores):
+    #         core.tick()
 
-            # Als een core (bijvoorbeeld via validA) op IDLE is gezet,
-            # en hij zit nog niet in de vrije wachtrij, pikken we hem op!
-            if core.coreStatus == 'IDLE' and core_id not in self.free_cores:
-                self.free_cores.append(core_id)
+    #         # Als een core (bijvoorbeeld via validA) op IDLE is gezet,
+    #         # en hij zit nog niet in de vrije wachtrij, pikken we hem op!
+    #         if core.coreStatus == 'IDLE' and core_id not in self.free_cores:
+    #             self.free_cores.append(core_id)
 
-        # 2. Voer DAARNA de huidige hoofd-CPU instructie uit (Fetch/Decode/Execute)
-        self._execute_cycle()
+    #     # 2. Voer DAARNA de huidige hoofd-CPU instructie uit (Fetch/Decode/Execute)
+    #     self._execute_cycle()
 
+    # def tick(self):
+    #     """Voert één volledige kloksnelheid-cyclus uit voor het hele systeem."""
+        
+    #     # 1. Geef alle cores in de matrix de ruimte om hun microstep te doen
+    #     for core_id, core in enumerate(self.cores):
+    #         core.tick()
+
+    #         # --- STAP A: Geef de reeds IDLE cores terug aan de wachtrij ---
+    #         # Dit verwerkt cores die in VORIGE ticks (of via ucore) op IDLE zijn gezet
+    #         if core.coreStatus == 'IDLE' and core_id not in self.free_cores:
+    #             self.free_cores.append(core_id)
+
+    #         # --- STAP B: CONTROLEER OP WEZEN (GARBAGE COLLECTION) ---
+    #         # Als een core VALID is, maar wees, zetten we hem NU op IDLE.
+    #         # Hij wordt pas de VOLGENDE tick in STAP A opgevangen!
+    #         if core.coreStatus == 'VALID':
+    #             in_register = any(reg_id == core_id for reg_id in self.registers.values())
+    #             is_test_core = (self.last_test_core == core_id)
+                
+    #             if not in_register and not is_test_core:
+    #                 core.coreStatus = 'IDLE'
+    #                 # core.value = 0
+    #                 # core.work = 0
+    #                 # core.transfer = 0
+    #                 # core.upc = 0
+
+    #     # 2. Voer DAARNA de huidige hoofd-CPU instructie uit
+    #     self._execute_cycle()
+
+    def tick(self):
+            """Voert één volledige kloksnelheid-cyclus uit voor het hele systeem."""
+            
+            # 1. Geef alle cores in de matrix de ruimte om hun microstep te doen
+            for core_id, core in enumerate(self.cores):
+                core.tick()
+
+                # --- STAP A: Geef de reeds IDLE cores terug aan de wachtrij ---
+                if core.coreStatus == 'IDLE' and core_id not in self.free_cores:
+                    self.free_cores.append(core_id)
+
+                # --- STAP B: CONTROLEER OP WEZEN (GARBAGE COLLECTION) ---
+                if core.coreStatus == 'VALID':
+                    in_register = any(reg_id == core_id for reg_id in self.registers.values())
+                    is_test_core = (self.last_test_core == core_id)
+                    
+                    # Check of er een WORKING core is die deze core_id als arg1 of arg2 heeft
+                    wordt_nog_bezocht = False
+                    for andere_core in self.cores:
+                        if andere_core.coreStatus == 'WORKING':
+                            if andere_core.arg1 == core_id or andere_core.arg2 == core_id:
+                                wordt_nog_bezocht = True
+                                break
+                    
+                    # Alleen opruimen als hij écht nergens meer aan gekoppeld is
+                    if not in_register and not is_test_core and not wordt_nog_bezocht:
+                        core.coreStatus = 'IDLE'
+                        # core.value = 0
+                        # core.work = 0
+                        # core.transfer = 0
+                        # core.upc = 0
+
+            # 2. Voer DAARNA de huidige hoofd-CPU instructie uit
+            self._execute_cycle()
 
 
     def _execute_cycle(self):
@@ -116,6 +179,8 @@ class CPU:
                 self.registers[reg1] = core_id
                 self.last_active_core = core_id
 
+
+
             elif opcode == Op.LDM:
                 if not self.free_cores: return # Stall
                 core_id = self.free_cores.popleft()
@@ -128,28 +193,6 @@ class CPU:
                 self.registers[reg1] = core_id
                 self.last_active_core = core_id
 
-            elif opcode == Op.STO:
-                # STO reg1 arg2 -> Sla de waarde van reg1 op in memory[arg2]
-                core_id = self.registers[reg1]
-                
-                # HARDWARE CHECK: Als het register nog None is (nooit toegewezen), gooien we een crash
-                if core_id is None:
-                    raise RuntimeError(
-                        f"Hardware Fault: STO aangeroepen op PC={self.PC-1} "
-                        f"(MIR={self.MIR}) waarbij Register {reg1} wordt aangesproken, "
-                        f"maar dit register heeft nog geen actieve Core-ID toegewezen gekregen!"
-                    )
-                
-                # 1. HARDWARE STALL: Wacht tot de betreffende core klaar is met rekenen!
-                if self.cores[core_id].coreStatus != 'VALID':
-                    return # Blijf in EXECUTE-state (stall) tot de core-data stabiel is.
-                
-                # 2. Haal de waarde rechtstreeks uit de stabiele core
-                value_to_store = self.cores[core_id].value
-                
-                # 3. Schrijf de waarde direct weg naar het RAM-geheugen
-                self.memory.memWrite(value_to_store, adres=arg2)
-                
             elif opcode == Op.ADD:
                 if not self.free_cores: return # Stall
                 core_id = self.free_cores.popleft()
@@ -158,6 +201,17 @@ class CPU:
                 src2_core = self.registers[arg2] 
                 
                 self.cores[core_id].dispatch('add', arg1=src1_core, arg2=src2_core)
+                self.registers[reg1] = core_id
+                self.last_active_core = core_id         
+                
+            elif opcode == Op.MUL:
+                if not self.free_cores: return # Stall
+                core_id = self.free_cores.popleft()
+                
+                src1_core = self.registers[reg1]
+                src2_core = self.registers[arg2] 
+                
+                self.cores[core_id].dispatch('slow_mul', arg1=src1_core, arg2=src2_core)
                 self.registers[reg1] = core_id
                 self.last_active_core = core_id
 
@@ -185,6 +239,28 @@ class CPU:
                 # Zodat main.py weet dat we klaar zijn.
                 self.cpu_state = 'HALT'
                 return
+            
+            elif opcode == Op.STO:
+                # STO reg1 arg2 -> Sla de waarde van reg1 op in memory[arg2]
+                core_id = self.registers[reg1]
+                
+                # HARDWARE CHECK: Als het register nog None is (nooit toegewezen), gooien we een crash
+                if core_id is None:
+                    raise RuntimeError(
+                        f"Hardware Fault: STO aangeroepen op PC={self.PC-1} "
+                        f"(MIR={self.MIR}) waarbij Register {reg1} wordt aangesproken, "
+                        f"maar dit register heeft nog geen actieve Core-ID toegewezen gekregen!"
+                    )
+                
+                # 1. HARDWARE STALL: Wacht tot de betreffende core klaar is met rekenen!
+                if self.cores[core_id].coreStatus != 'VALID':
+                    return # Blijf in EXECUTE-state (stall) tot de core-data stabiel is.
+                
+                # 2. Haal de waarde rechtstreeks uit de stabiele core
+                value_to_store = self.cores[core_id].value
+                
+                # 3. Schrijf de waarde direct weg naar het RAM-geheugen
+                self.memory.memWrite(value_to_store, adres=arg2)
 
             elif opcode == Op.JMP:
                 self.PC = arg2
