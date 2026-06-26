@@ -4,7 +4,7 @@ from memory import Memory
 from ucore  import Ucore
 
 # Importeer de STERN-boekhouding uit het andere bestand
-from opcodes import Op, FORMAT_ZERO, FORMAT_ONE_ADDR, FORMAT_ONE_REG, FORMAT_TWO_REG_REG
+from opcodes import Op, FORMAT_ZERO, FORMAT_ONE_ADDR, FORMAT_ONE_REG, FORMAT_TWO_REG_REG, FORMAT_TWO_REG_VAL
 
 class CPU:
     def __init__(self):
@@ -40,50 +40,6 @@ class CPU:
         # We stoppen alle Core ID's (0 t/m 15) in de vrije wachtrij
         self.free_cores = deque(range(16))
 
-    # def tick(self):
-    #     """Voert één volledige kloksnelheid-cyclus uit voor het hele systeem."""
-        
-    #     # 1. Geef EERST alle cores in de matrix de ruimte om hun microstep te doen
-    #     #for core in self.cores:
-    #     for core_id, core in enumerate(self.cores):
-    #         core.tick()
-
-    #         # Als een core (bijvoorbeeld via validA) op IDLE is gezet,
-    #         # en hij zit nog niet in de vrije wachtrij, pikken we hem op!
-    #         if core.coreStatus == 'IDLE' and core_id not in self.free_cores:
-    #             self.free_cores.append(core_id)
-
-    #     # 2. Voer DAARNA de huidige hoofd-CPU instructie uit (Fetch/Decode/Execute)
-    #     self._execute_cycle()
-
-    # def tick(self):
-    #     """Voert één volledige kloksnelheid-cyclus uit voor het hele systeem."""
-        
-    #     # 1. Geef alle cores in de matrix de ruimte om hun microstep te doen
-    #     for core_id, core in enumerate(self.cores):
-    #         core.tick()
-
-    #         # --- STAP A: Geef de reeds IDLE cores terug aan de wachtrij ---
-    #         # Dit verwerkt cores die in VORIGE ticks (of via ucore) op IDLE zijn gezet
-    #         if core.coreStatus == 'IDLE' and core_id not in self.free_cores:
-    #             self.free_cores.append(core_id)
-
-    #         # --- STAP B: CONTROLEER OP WEZEN (GARBAGE COLLECTION) ---
-    #         # Als een core VALID is, maar wees, zetten we hem NU op IDLE.
-    #         # Hij wordt pas de VOLGENDE tick in STAP A opgevangen!
-    #         if core.coreStatus == 'VALID':
-    #             in_register = any(reg_id == core_id for reg_id in self.registers.values())
-    #             is_test_core = (self.last_test_core == core_id)
-                
-    #             if not in_register and not is_test_core:
-    #                 core.coreStatus = 'IDLE'
-    #                 # core.value = 0
-    #                 # core.work = 0
-    #                 # core.transfer = 0
-    #                 # core.upc = 0
-
-    #     # 2. Voer DAARNA de huidige hoofd-CPU instructie uit
-    #     self._execute_cycle()
 
     def tick(self):
             """Voert één volledige kloksnelheid-cyclus uit voor het hele systeem."""
@@ -153,6 +109,9 @@ class CPU:
             elif opcode in FORMAT_TWO_REG_REG:
                 self.decoded_reg1 = payload % 10  
                 self.decoded_arg2 = payload // 10 
+            elif opcode in FORMAT_TWO_REG_VAL:
+                self.decoded_reg1 = payload % 10  # Register
+                self.decoded_arg2 = payload // 10 # Directe waarde of RAM-adres
             elif opcode in FORMAT_ONE_REG:
                 self.decoded_reg1 = payload % 10
                 self.decoded_arg2 = 0
@@ -179,8 +138,6 @@ class CPU:
                 self.registers[reg1] = core_id
                 self.last_active_core = core_id
 
-
-
             elif opcode == Op.LDM:
                 if not self.free_cores: return # Stall
                 core_id = self.free_cores.popleft()
@@ -192,6 +149,28 @@ class CPU:
                 self.cores[core_id].dispatch('ldv') # Laad de waarde in de core
                 self.registers[reg1] = core_id
                 self.last_active_core = core_id
+
+            elif opcode == Op.LDX:
+                
+                # LDX Rx mem_base -> Laad in Rx de waarde vanaf RAM-adres (mem_base + R0)
+                # R0 (index 0) is ons vaste index-register 'I'
+                index_core = self.registers[0]  # Haal de core op die gekoppeld is aan R0 (I)
+                
+                if index_core is not None and self.cores[index_core].coreStatus == 'VALID':
+                    if not self.free_cores: return          #  Fast Stall when there is no free ucore
+                    core_id = self.free_cores.popleft()     #  Get the ucore 
+
+                    # Bereken het effectieve adres: mem_base (arg2) + de waarde van I
+                    effective_addr = arg2 + self.cores[index_core].value
+                    ram_value = self.memory.memRead(effective_addr)
+                    
+                    self.cores[core_id].transfer = ram_value
+                    self.cores[core_id].dispatch('ldv') # Laad de waarde in de core
+                    self.registers[reg1] = core_id
+                    self.last_active_core = core_id
+                else:
+                    return  # Stall de CPU als de waarde in index-register I nog niet VALID is
+        
 
             elif opcode == Op.ADD:
                 if not self.free_cores: return # Stall
@@ -215,6 +194,17 @@ class CPU:
                 self.registers[reg1] = core_id
                 self.last_active_core = core_id
 
+            elif opcode == Op.MOD:
+                if not self.free_cores: return # Stall
+                core_id = self.free_cores.popleft()
+                
+                src1_core = self.registers[reg1]
+                src2_core = self.registers[arg2] 
+                
+                self.cores[core_id].dispatch('mod', arg1=src1_core, arg2=src2_core)
+                self.registers[reg1] = core_id
+                self.last_active_core = core_id
+
             elif opcode == Op.TSTE:
                 # NIEUW: Test op Gelijkheid (bijv: tste A B)
                 if not self.free_cores: return # Stall
@@ -225,11 +215,13 @@ class CPU:
                 
                 # Start de core met de microcode 'cmpe' uit ucore.py
                 self.cores[core_id].dispatch('cmpe', arg1=src1_core, arg2=src2_core)
+
                 
                 # Update de registers én registreer dit als de laatste test-core!
                 self.registers[reg1] = core_id
                 self.last_active_core = core_id
                 self.last_test_core = core_id  # <--- HIER leggen we de 'booleaanse waarheid' vast!
+
 
             # ==========================================
             #   SYSTEM / FLOW CONTROL
@@ -262,42 +254,100 @@ class CPU:
                 # 3. Schrijf de waarde direct weg naar het RAM-geheugen
                 self.memory.memWrite(value_to_store, adres=arg2)
 
+            elif opcode == Op.STX:
+                # STX Rx mem_base -> Sla de waarde van Rx op op RAM-adres (mem_base + R0)
+                index_core = self.registers[0]         # R0 is ons index-register I
+                data_core = self.registers[reg1]       # De core gekoppeld aan Rx die we willen opslaan
+                
+                # We kunnen pas schrijven als BEIDE cores VALID zijn!
+                if (index_core is not None and self.cores[index_core].coreStatus == 'VALID' and
+                    data_core is not None and self.cores[data_core].coreStatus == 'VALID'):
+                    
+                    # Bereken het effectieve adres: mem_base (arg2) + de waarde van I
+                    effective_addr = arg2 + self.cores[index_core].value
+                    val_to_store = self.cores[data_core].value
+                    
+                    # Schrijf het direct weg naar het RAM-geheugen
+                    # self.memory.memWrite(effective_addr, val_to_store)
+                    self.memory.memWrite(val_to_store, adres=effective_addr)
+                else:
+                    return  # Stall de CPU als I of Rx nog niet klaar is met rekenen
+
             elif opcode == Op.JMP:
                 self.PC = arg2
 
+            # elif opcode == Op.JMPT:
+            #     # GEWIJZIGD: We kijken nu naar last_test_core in plaats van last_active_core!
+            #     if self.last_test_core is not None:
+            #         # Wacht tot de specifieke test-core op VALID springt
+            #         if self.cores[self.last_test_core].coreStatus == 'VALID':
+            #             if self.cores[self.last_test_core].status == True:
+            #                 self.PC = arg2
+            #             # Als de status False is, springen we niet en gaan we gewoon naar de volgende FETCH
+            #         else:
+            #             return # Stall! De test-core is nog bezig, bevries de CPU voor deze tick.
+            #     else:
+            #         # FIX: Geen silent error meer, maar een keiharde hardware crash!
+            #         raise RuntimeError(
+            #             f"Hardware Fault: JMPT aangeroepen op PC={self.PC-1} "
+            #             f"(MIR={self.MIR}) zonder dat er vooraf een test-instructie "
+            #             f"(zoals TSTE) is uitgevoerd!"
+            #         )
             elif opcode == Op.JMPT:
-                # GEWIJZIGD: We kijken nu naar last_test_core in plaats van last_active_core!
-                if self.last_test_core is not None:
-                    # Wacht tot de specifieke test-core op VALID springt
-                    if self.cores[self.last_test_core].coreStatus == 'VALID':
-                        if self.cores[self.last_test_core].status == True:
-                            self.PC = arg2
-                        # Als de status False is, springen we niet en gaan we gewoon naar de volgende FETCH
-                    else:
-                        return # Stall! De test-core is nog bezig, bevries de CPU voor deze tick.
-                else:
-                    # FIX: Geen silent error meer, maar een keiharde hardware crash!
-                    raise RuntimeError(
-                        f"Hardware Fault: JMPT aangeroepen op PC={self.PC-1} "
-                        f"(MIR={self.MIR}) zonder dat er vooraf een test-instructie "
-                        f"(zoals TSTE) is uitgevoerd!"
-                    )
+                if self.last_test_core is None:
+                    raise RuntimeError("Hardware Fault: JMPT zonder voorafgaande TSTE!")
+                
+                test_core = self.cores[self.last_test_core]
+                
+                # STAP 1: De Stall-barrière
+                # Is de ucore nog bezig? Dwing de EXECUTE-state en stop de tick (Stall)
+                if test_core.coreStatus == 'WORKING':
+                    self.cpu_state = 'EXECUTE'
+                    return
+                
+                # STAP 2: De Ontsnapping / Uitvoering
+                # Als we hier komen is de core gegarandeerd VALID!
+                if test_core.status == True:
+                    self.PC = arg2
+                
+                # De instructie is afgehandeld, we mogen weer fetchen
+                self.cpu_state = 'FETCH'
+
+            # elif opcode == Op.JMPF:
+            #     # GEWIJZIGD: Idem voor Jump if False
+            #     if self.last_test_core is not None:
+            #         if self.cores[self.last_test_core].coreStatus == 'VALID':
+            #             if self.cores[self.last_test_core].status == False:
+            #                 self.PC = arg2
+            #         else:
+            #             return # Stall
+            #     else:
+            #         # FIX: Geen silent error meer, maar een keiharde hardware crash!
+            #         raise RuntimeError(
+            #             f"Hardware Fault: JMPF aangeroepen op PC={self.PC-1} "
+            #             f"(MIR={self.MIR}) zonder dat er vooraf een test-instructie "
+            #             f"(zoals TSTE) is uitgevoerd!"
+            #         )
 
             elif opcode == Op.JMPF:
-                # GEWIJZIGD: Idem voor Jump if False
-                if self.last_test_core is not None:
-                    if self.cores[self.last_test_core].coreStatus == 'VALID':
-                        if self.cores[self.last_test_core].status == False:
-                            self.PC = arg2
-                    else:
-                        return # Stall
-                else:
-                    # FIX: Geen silent error meer, maar een keiharde hardware crash!
-                    raise RuntimeError(
-                        f"Hardware Fault: JMPF aangeroepen op PC={self.PC-1} "
-                        f"(MIR={self.MIR}) zonder dat er vooraf een test-instructie "
-                        f"(zoals TSTE) is uitgevoerd!"
-                    )
+                if self.last_test_core is None:
+                    raise RuntimeError("Hardware Fault: JMPF zonder voorafgaande TSTE!")
+                
+                test_core = self.cores[self.last_test_core]
+                
+                # STAP 1: De Stall-barrière
+                # Is de ucore nog bezig? Dwing de EXECUTE-state en stop de tick (Stall)
+                if test_core.coreStatus == 'WORKING':
+                    self.cpu_state = 'EXECUTE'
+                    return
+                
+                # STAP 2: De Ontsnapping / Uitvoering
+                # Als we hier komen is de core gegarandeerd VALID!
+                if test_core.status == False:
+                    self.PC = arg2
+                
+                # De instructie is afgehandeld, we mogen weer fetchen
+                self.cpu_state = 'FETCH'
 
             self.cpu_state = 'FETCH'
 

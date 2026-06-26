@@ -1,6 +1,6 @@
 # main.py
 from cpu import CPU
-from opcodes import Op, Reg
+from opcodes import Op, Reg, assembly_program, encrypt_program
 from assembler import assemble
 from frontpanel import FrontPanel
 
@@ -13,64 +13,9 @@ def run_test():
     # Initialiseer het frontpaneel als de vlag aan staat
     panel = FrontPanel(num_cores=16) if SHOW_GUI else None
 
-    # Je volledige programma, nu super leesbaar met labels!
-    # assembly_program = """
-    # LDI  A, 0        ; Laad accumulator A met 42
-    # LDI  B, 100      ; Laad register B met 42
-    # LDI  C, 1
-    # TEST:
-    #     TSTE A, B          ; Vergelijk Register A en Register B
-    #     JMPT END_IF      ; Spring naar de ELSE-tak als uitkomst False is
-    
-    #     ADD A, C     ; ELSE-tak: Zet A op 11
-    #     JMP TEST
-        
-    # END_IF:
-    #     LDI A, 99
-    #     STO  A, 100    ; Sla de uiteindelijke waarde van A op op RAM-adres 100
-    #     HALT           ; Einde van de simulatie
-    # """
-    # assembly_program = """ 
-    #     LDI A -42         ; Activeert een core om A = 4 te maken
-    #     LDI B 4200        ; Activeert een core om B = 3 te maken
-    #     MUL A B         ; CPU delegeert 'slow_mul' aan een nieuwe core met arg1=Core_A en arg2=Core_B
-    #     STO A 100       ; CPU stalled tot de MUL core VALID is, en schrijft 12 naar adres 50
-    #     HALT 
-    # """
-    assembly_program = """ 
-        ; --- INITIALISATIE ---
-        LDI A 0            ; Register A = Onze loop-counter (start op 0)
-        LDI B 100            ; Register B = De doelwaarde van de counter (3)
-        LDI C 1            ; Register C = De stapgrootte (+1 per ronde)
-        LDI X 0            ; Register X = De totale som-accumulator (start op 0)
-        LDI Y 5            ; Register Y = De vaste waarde die we telkens vermenigvuldigen (5)
-
-    LOOP:
-        ; --- TEST LUSCONDITIE ---
-        TSTE A B           ; Vergelijk counter (A) met doelwaarde 3 (B)
-        JMPT END_LOOP      ; Als A == 3 (True), spring uit de lus naar END_LOOP
-
-        ; --- BEREKENING ---
-        MUL Y A            ; Activeer core voor Y * A (de huidige stap)
-        ADD X Y            ; CPU stalled tot de MUL core VALID is, en telt op bij X
-
-        ; --- TELLER OPHOGEN ---
-        ADD A C            ; A = A + 1 (Verhoog counter)
-
-        ; --- REFRESH INVOER ---
-        LDI Y 5            ; Overschrijf register Y met de schone waarde 5
-                           ; om te voorkomen dat het oude Core-ID als invoer dient
-
-        JMP LOOP           ; Spring onvoorwaardelijk terug naar de start van de lus
-
-    END_LOOP:
-        ; --- AFRASTING EN OPSLAG ---
-        STO X 100          ; Sla de totale som (X) op op RAM-adres 100
-        HALT               ; Sluit de simulatie af
-    """
 
     # De assembler doet nu al het rekenwerk voor je!
-    test_program = assemble(assembly_program)
+    test_program = assemble(encrypt_program)        # the source can be found in opcodes.py
     
     # Print even ter controle de gegenereerde machinecode integers
     print(f"Gegenereerde machinecode: {test_program}\n")
@@ -79,11 +24,9 @@ def run_test():
     for adres, machine_woord in enumerate(test_program):
         cpu.memory.memWrite(machine_woord, adres)
 
-    # 3. Schrijf alvast een testwaarde op adres 20 voor de LDM instructie
-    # LDM B 20 gaat deze 55 dus inlezen in Register B!
-    cpu.memory.memWrite(55, adres=20)
 
-    # 4. Start de klok-lus (Clock Cycles)
+
+    # Start de klok-lus (Clock Cycles)
     max_ticks = 1000000  # We kunnen dit nu gerust hoger zetten als veiligheidsmarge
     for tick_count in range(1, max_ticks + 1):
         current_state = cpu.cpu_state
@@ -150,9 +93,32 @@ def run_test():
             
     print("==========================================================\n")
 
-    # NIEUW: Lees de permanent opgeslagen waarde uit het RAM-geheugen op adres 100
-    ram_value_100 = cpu.memory.memRead(100)
-    print(f"-> RAM OPBESLAG (Adres 100): {ram_value_100} (Verwacht na STO: 99)")
+    
+    # === NIEUW: Print de databuffer vanaf 512 (Masterkey + Encrypted String) ===
+    # === GEHEUGEN DUMP (Consistent vanaf 512 voor 24 adressen) ===
+    print("==========================================================")
+    print("             GEHEUGEN DUMP (Adres 512 t/m 535)            ")
+    print("==========================================================")
+    
+    start_adres = 512
+    aantal_adressen = 24
+    
+    for i in range(aantal_adressen):
+        current_addr = start_adres + i
+        waarde = cpu.memory.memRead(current_addr)
+        
+        # Vertaal ALTIJD naar een karakter als het binnen de leesbare ASCII-reeks valt
+        if 32 <= waarde <= 126:
+            char_repr = f"'{chr(waarde)}'"
+        else:
+            char_repr = "???"
+            
+        # Voeg alleen het specifieke label toe voor de Master Key op het startadres
+        label = " <-- Master Key (M)" if current_addr == 512 else ""
+        
+        print(f"Adres {current_addr:<3} | Waarde: {waarde:<5} | Karakter: {char_repr:<5}{label}")
+        
+    print("==========================================================\n")
 
 
      # Nette afsluiting van het venster na de HALT

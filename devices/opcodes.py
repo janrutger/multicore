@@ -18,8 +18,7 @@ class Op(IntEnum):
     CALLX = 25
     INT   = 26
 
-    # --- FORMAT: TWO_REG_VAL / TWO_REG_ADDR ---
-    LD    = 30  
+    # --- FORMAT: TWO_REG_VAL / TWO_REG_ADDR --- 
     LDI   = 31
     LDM   = 32
     LDX   = 33
@@ -37,10 +36,11 @@ class Op(IntEnum):
     USTACK= 93
 
     # --- FORMAT: TWO_REG_REG ---
+    LD    = 30 
     ADD   = 50  
     SUB   = 52
     MUL   = 60
-    DMOD  = 65
+    MOD   = 65
     TSTE  = 71
     TSTG  = 72
 
@@ -54,7 +54,8 @@ class Op(IntEnum):
 FORMAT_ZERO        = {Op.HALT, Op.RET, Op.EI, Op.DI, Op.RTI}
 FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.CALL, Op.CALLX, Op.INT}
 FORMAT_ONE_REG     = {Op.PUSH, Op.POP, Op.GPU, Op.CALLS}
-FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.DMOD, Op.TSTE, Op.TSTG}
+FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.TSTE, Op.TSTG}
+FORMAT_TWO_REG_VAL = {Op.LDI, Op.LDM, Op.LDX, Op.STO, Op.STX, Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI}
 
 class Reg(IntEnum):
     I  = 0  # Index Register (Vaste hardware-koppeling voor LDX/STX)
@@ -117,5 +118,219 @@ MICROCODE_ROM = {
         'mv_tv',               # 15: Zet het positieve resultaat uit T terug in V
         'sign_vxor',           # 16: Pas het onthouden teken toe op V via XOR!
         'setResult'            # 17: Meld aan de CPU dat de core VALID is
+    ],
+
+    'mod' : [
+        'valid_v',         # 0: Vacht op invoer V (het grote getal komt in self.value)
+        'valid_w',         # 1: Wacht op invoer W (de deler komt in self.work)
+        
+        # --- HOOFD GUARD: CHECK DELER OP 0 (Puur intern!) ---
+        'mv_vt',           # 2: T = V (Sla het grote getal VEILIG op in kluis T)
+        'mv_vw',           # 3: V = W (Zet de deler W tijdelijk in V om te kunnen testen)
+        'tstz',            # 4: Is V (de deler) gelijk aan 0?
+        ('bra_true', 8),   # 5: JA? De deler is 0! Spring direct naar setResult (+8 -> index 13)
+        
+        # --- NOPE? HERSTEL V EN REKEN-SAFE MAKEN ---
+        'mv_tv',           # 6: V = T (Haal het grote getal weer onbeschadigd uit kluis T)
+        'abs_v',           # 7: Maak V positief (signed arithmetic safe)
+        'abs_w',           # 8: Maak W positief
+        
+        # --- DE VEILIGE MODULO LUS ---
+        'cmplt',           # 9:  self.status = (self.value < self.work)
+        ('bra_true', 3),   # 10: JA? Klaar! Spring +3 naar setResult (index 13)
+        'sub',             # 11: self.value = self.value - self.work
+        ('bra_always', -3),# 12: Spring -3 terug naar cmplt (index 9)
+        
+        'setResult'        # 13: Meld aan de CPU dat we VALID zijn
     ]
 }
+
+
+
+
+
+# some assembly programming here to keep main.py clear and redeble
+assembly_program = """ 
+        ; ==========================================================
+        ; REPRODUCTIE-TEST: HOE TSTE REGISTER C CORRUPTEERT
+        ; ==========================================================
+            LDI A 0             ; Accumulator A begint op 0
+            LDI Z 0             ; Register Z staat op 0
+            
+            LDI C 100           ; Laad de waarde 100 in Register C
+            
+            TSTE C Z            ; Vergelijk C (100) met Z (0). 
+                                ; Dit koppelt Register C foutief aan de test-core.
+                                
+            JMPF DONT_JUMP      ; Dit dwingt de CPU om te wachten (stallen) tot de 
+                                ; test-core VALID is. Hierdoor krijgt de ucore de 
+                                ; tijd om de echte testuitslag (0 / False) in de core te schrijven!
+
+        DONT_JUMP:
+            ADD A C             ; Tel C op bij A.
+                                ; VERWACHT: A = 100 (als C zijn waarde behield)
+                                ; REPRODUCTIE BUG: A = 0 (omdat C nu de test-core is!)
+
+            STO A 513           ; Schrijf het resultaat weg naar adres 513
+            HALT
+            """
+
+
+# lets write the encrypt and decrypt method
+# total 124 main memory 
+encrypt_program = """
+    LDI M 251           ; Value of the master key
+    STO M 512           ; Store masterkey at 512
+
+    LDI I 0             ; zet de index register
+    LDI X 1             ; zet de stap grote
+    
+    LDI C 72            ; 'H'
+    STX C 520
+    ADD I X
+    LDI C 101           ; 'e'
+    STX C 520
+    ADD I X
+    LDI C 108           ; 'l'
+    STX C 520
+    ADD I X
+    LDI C 108           ; 'l'
+    STX C 520
+    ADD I X
+    LDI C 111           ; 'o'
+    STX C 520
+    ADD I X
+    LDI C 32            ; ' ' (Spatie) 32
+    STX C 520
+    ADD I X
+    LDI C 119           ; 'w'
+    STX C 520
+    ADD I X
+    LDI C 111           ; 'o'
+    STX C 520
+    ADD I X
+    LDI C 114           ; 'r'
+    STX C 520
+    ADD I X
+    LDI C 108           ; 'l'
+    STX C 520
+    ADD I X
+    LDI C 100           ; 'd'
+    STX C 520
+    ADD I X
+    
+    LDI C 0             ; Null-terminator (Einde van het bericht)
+    STX C 520
+    ADD I X
+    
+
+
+
+    ; create the PIN-code signature by adding the char values of the message
+    ; Store de PIN-code in 513
+    ; ==========================================================
+    ;  DE LUS: BEREKEN PIN-CODE SIGNATURE VANAF ADRES 520 TILL 0
+    ; ==========================================================
+        LDI I 0             ; Reset index register naar begin van de string (0)
+        LDI A 0             ; Register A wordt onze PIN-code accumulator
+        LDI Z 0             ; Register Z houden we op 0 voor de terminator-check
+
+    PIN_LOOP:
+        LDX C 520           ; Laad het karakter op (520 + I) in register C
+        TSTE C Z            ; Is het geladen karakter gelijk aan 0 (Null-terminator)?
+        JMPT PIN_DONE       ; JA? Dan zijn we klaar met de string! Spring uit de lus.
+
+        ADD A C             ; NEE? Tel de ASCII-waarde van het karakter op bij A
+        ADD I X             ; Verhoog de index I met stapgrootte X (1)
+        JMP PIN_LOOP        ; Spring terug naar het begin van de lus
+
+    PIN_DONE:
+        STO A 513           ; Store de uiteindelijke PIN-code in 513
+
+    ; --- HASH FUNCTIE: Hash(MasterKey, PIN) ---
+    ; Gebruik Register M (512) en A (513)
+        LDM M 512           ; M = Master Key
+        LDM A 513           ; A = PIN-code Checksum
+
+        ; --- EENVOUDIGE MIX-OPERATIE ---
+        ; We willen: Hash = (M XOR A) + (M ROL 3) of iets dergelijks
+        ; Omdat we geen ROL (Rotate Left) hebben, gebruiken we vermenigvuldiging
+        
+        LDI B 31            ; Een priemgetal als "mixer" voor spreiding
+        MUL M B             ; M = M * 31 (Dit zorgt voor een bit-shift effect)
+        
+        ; Nu de PIN erbij mengen
+        ADD M A             ; Voeg de PIN toe aan de gemixte Master Key
+        
+        ; Store de uiteindelijke Hash
+        STO M 514           ; Sla de hash op in adres 514
+        
+        HALT
+"""
+
+
+
+
+#### Other assembly test programs
+# Je volledige programma, nu super leesbaar met labels!
+    # assembly_program = """
+    # LDI  A, 0        ; Laad accumulator A met 42
+    # LDI  B, 100      ; Laad register B met 42
+    # LDI  C, 1
+    # TEST:
+    #     TSTE A, B          ; Vergelijk Register A en Register B
+    #     JMPT END_IF      ; Spring naar de ELSE-tak als uitkomst False is
+    
+    #     ADD A, C     ; ELSE-tak: Zet A op 11
+    #     JMP TEST
+        
+    # END_IF:
+    #     LDI A, 99
+    #     STO  A, 100    ; Sla de uiteindelijke waarde van A op op RAM-adres 100
+    #     HALT           ; Einde van de simulatie
+    # """
+    # assembly_program = """ 
+    #     LDI A -42         ; Activeert een core om A = 4 te maken
+    #     LDI B 4200        ; Activeert een core om B = 3 te maken
+    #     MUL A B         ; CPU delegeert 'slow_mul' aan een nieuwe core met arg1=Core_A en arg2=Core_B
+    #     STO A 100       ; CPU stalled tot de MUL core VALID is, en schrijft 12 naar adres 50
+    #     HALT 
+    # """
+    # assembly_program = """ 
+    #     ; --- INITIALISATIE ---
+    #     LDI A 0            ; Register A = Onze loop-counter (start op 0)
+    #     LDI B 100            ; Register B = De doelwaarde van de counter (3)
+    #     LDI C 1            ; Register C = De stapgrootte (+1 per ronde)
+    #     LDI X 0            ; Register X = De totale som-accumulator (start op 0)
+    #     LDI Y 5            ; Register Y = De vaste waarde die we telkens vermenigvuldigen (5)
+
+    # LOOP:
+    #     ; --- TEST LUSCONDITIE ---
+    #     TSTE A B           ; Vergelijk counter (A) met doelwaarde 3 (B)
+    #     JMPT END_LOOP      ; Als A == 3 (True), spring uit de lus naar END_LOOP
+
+    #     ; --- BEREKENING ---
+    #     MUL Y A            ; Activeer core voor Y * A (de huidige stap)
+    #     ADD X Y            ; CPU stalled tot de MUL core VALID is, en telt op bij X
+
+    #     ; --- TELLER OPHOGEN ---
+    #     ADD A C            ; A = A + 1 (Verhoog counter)
+
+    #     ; --- REFRESH INVOER ---
+    #     LDI Y 5            ; Overschrijf register Y met de schone waarde 5
+    #                        ; om te voorkomen dat het oude Core-ID als invoer dient
+
+    #     JMP LOOP           ; Spring onvoorwaardelijk terug naar de start van de lus
+
+    # END_LOOP:
+    #     ; --- AFRASTING EN OPSLAG ---
+    #     STO X 100          ; Sla de totale som (X) op op RAM-adres 100
+    #     HALT               ; Sluit de simulatie af
+    # """
+
+    # assembly_program = """ 
+    #     LDI A 18
+    #     LDI B 5
+    #     MOD A B
+    #     HALT
+    # """
