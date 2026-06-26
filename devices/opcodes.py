@@ -43,6 +43,7 @@ class Op(IntEnum):
     MOD   = 65
     TSTE  = 71
     TSTG  = 72
+    XOR   = 42
 
     # --- FORMAT: ONE_REG ---
     PUSH  = 90
@@ -54,7 +55,7 @@ class Op(IntEnum):
 FORMAT_ZERO        = {Op.HALT, Op.RET, Op.EI, Op.DI, Op.RTI}
 FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.CALL, Op.CALLX, Op.INT}
 FORMAT_ONE_REG     = {Op.PUSH, Op.POP, Op.GPU, Op.CALLS}
-FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.TSTE, Op.TSTG}
+FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.TSTE, Op.TSTG, Op.XOR}
 FORMAT_TWO_REG_VAL = {Op.LDI, Op.LDM, Op.LDX, Op.STO, Op.STX, Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI}
 
 class Reg(IntEnum):
@@ -92,6 +93,8 @@ MICROCODE_ROM = {
     'cmpne':  ['valid_v', 'valid_w', 'cmpne', 'setResult'],
     'cmpgt':  ['valid_v', 'valid_w', 'cmpgt', 'setResult'],
     'cmplt':  ['valid_v', 'valid_w', 'cmplt', 'setResult'],
+
+    'xor_vw': ['valid_v', 'valid_w', 'xor_vw','setResult'],
 
    'slow_mul': [
         'valid_v',             # 0: Wacht op A en onthoud teken
@@ -151,33 +154,18 @@ MICROCODE_ROM = {
 
 # some assembly programming here to keep main.py clear and redeble
 assembly_program = """ 
-        ; ==========================================================
-        ; REPRODUCTIE-TEST: HOE TSTE REGISTER C CORRUPTEERT
-        ; ==========================================================
-            LDI A 0             ; Accumulator A begint op 0
-            LDI Z 0             ; Register Z staat op 0
-            
-            LDI C 100           ; Laad de waarde 100 in Register C
-            
-            TSTE C Z            ; Vergelijk C (100) met Z (0). 
-                                ; Dit koppelt Register C foutief aan de test-core.
-                                
-            JMPF DONT_JUMP      ; Dit dwingt de CPU om te wachten (stallen) tot de 
-                                ; test-core VALID is. Hierdoor krijgt de ucore de 
-                                ; tijd om de echte testuitslag (0 / False) in de core te schrijven!
+        ; --- XOR TEST PROGRAMMA ---
+            LDI K 487          ; value of the master key
+            LDI C 72           ; Laad data (72) in register C
 
-        DONT_JUMP:
-            ADD A C             ; Tel C op bij A.
-                                ; VERWACHT: A = 100 (als C zijn waarde behield)
-                                ; REPRODUCTIE BUG: A = 0 (omdat C nu de test-core is!)
-
-            STO A 513           ; Schrijf het resultaat weg naar adres 513
+            XOR C K            ; D = D ^ M
+            STO C 520          ; Sla resultaat terug op in geheugen
             HALT
             """
 
 
 # lets write the encrypt and decrypt method
-# total 124 main memory 
+# total 1024 main memory 
 encrypt_program = """
     LDI M 251           ; Value of the master key
     STO M 512           ; Store masterkey at 512

@@ -205,6 +205,17 @@ class CPU:
                 self.registers[reg1] = core_id
                 self.last_active_core = core_id
 
+            elif opcode == Op.XOR:
+                if not self.free_cores: return # Stall
+                core_id = self.free_cores.popleft()
+                
+                src1_core = self.registers[reg1]
+                src2_core = self.registers[arg2] 
+                
+                self.cores[core_id].dispatch('xor_vw', arg1=src1_core, arg2=src2_core)
+                self.registers[reg1] = core_id
+                self.last_active_core = core_id
+
             elif opcode == Op.TSTE:
                 # NIEUW: Test op Gelijkheid (bijv: tste A B)
                 if not self.free_cores: return # Stall

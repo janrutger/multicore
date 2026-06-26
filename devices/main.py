@@ -15,7 +15,8 @@ def run_test():
 
 
     # De assembler doet nu al het rekenwerk voor je!
-    test_program = assemble(encrypt_program)        # the source can be found in opcodes.py
+    # test_program = assemble(encrypt_program)        # the source can be found in opcodes.py
+    test_program = assemble(assembly_program)  
     
     # Print even ter controle de gegenereerde machinecode integers
     print(f"Gegenereerde machinecode: {test_program}\n")

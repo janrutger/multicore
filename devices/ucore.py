@@ -210,6 +210,11 @@ class Ucore:
             self.status = (self.value < self.work)
             self.upc += 1
 
+        # logische functies
+        elif uinstruction == 'xor_vw':
+            self.value = self.value ^ self.work
+            self.upc += 1
+
         # --- MICRO BRANCHING LOGICA ---
         elif uinstruction == 'bra_always':
             self.upc += uoperand  # Overschrijf de upc direct met het doeladres
