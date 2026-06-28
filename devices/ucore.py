@@ -215,6 +215,16 @@ class Ucore:
             self.value = self.value ^ self.work
             self.upc += 1
 
+        elif uinstruction == 'shftl_vw':        # shift V, W times
+            self.value = self.value << self.work
+            self.upc += 1
+
+        elif uinstruction == 'rol32_vw':
+            shift = self.work
+            val   = self.value & 0xFFFFFFFF   # maak Val 32 bits (high numbers loose precision)
+            self.value = ((val << shift) | (val >> (32 - shift))) & 0xFFFFFFFF
+            self.upc += 1
+
         # --- MICRO BRANCHING LOGICA ---
         elif uinstruction == 'bra_always':
             self.upc += uoperand  # Overschrijf de upc direct met het doeladres

@@ -88,9 +88,9 @@ def run_test():
         
         # Geef de actieve/valid registers een opvallend vlaggetje in de log
         if reg_naam != "-":
-            print(f"Core {c_id:<2} | {status:<8} | {val:<8} | <-- {reg_naam}")
+            print(f"Core {c_id:<2} | {status:<8} | {val:>10} | <-- {reg_naam}")
         else:
-            print(f"Core {c_id:<2} | {status:<8} | {val:<8} | {reg_naam}")
+            print(f"Core {c_id:<2} | {status:<8} | {val:>10} | {reg_naam}")
             
     print("==========================================================\n")
 
@@ -117,7 +117,7 @@ def run_test():
         # Voeg alleen het specifieke label toe voor de Master Key op het startadres
         label = " <-- Master Key (M)" if current_addr == 512 else ""
         
-        print(f"Adres {current_addr:<3} | Waarde: {waarde:<5} | Karakter: {char_repr:<5}{label}")
+        print(f"Adres {current_addr:<3} | Waarde: {waarde:>10} | Karakter: {char_repr:<5}{label}")
         
     print("==========================================================\n")
 

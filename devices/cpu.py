@@ -216,6 +216,42 @@ class CPU:
                 self.registers[reg1] = core_id
                 self.last_active_core = core_id
 
+            elif opcode == Op.SHIFTL:
+                if not self.free_cores: return # Stall
+                core_id = self.free_cores.popleft()
+
+                src1_core = self.registers[reg1]
+                self.cores[core_id].transfer = arg2
+
+                self.cores[core_id].dispatch('shftl', arg1=src1_core, arg2=None)
+                self.registers[reg1] = core_id
+                self.last_active_core = core_id
+
+            elif opcode == Op.SM32_RND:
+                if not self.free_cores: return # Stall
+                core_id = self.free_cores.popleft()
+
+                src1_core = self.registers[reg1]
+                self.cores[core_id].transfer = arg2
+
+                self.cores[core_id].dispatch('sm32_rnd', arg1=src1_core, arg2=None)
+                self.registers[reg1] = core_id
+                self.last_active_core = core_id
+
+            
+
+            elif opcode == Op.ROTL32:
+                if not self.free_cores: return # Stall
+                core_id = self.free_cores.popleft()
+
+                src1_core = self.registers[reg1]
+                self.cores[core_id].transfer = arg2
+
+                # Start de 'rol32' microcode keten
+                self.cores[core_id].dispatch('rol32', arg1=src1_core, arg2=None)
+                self.registers[reg1] = core_id
+                self.last_active_core = core_id
+
             elif opcode == Op.TSTE:
                 # NIEUW: Test op Gelijkheid (bijv: tste A B)
                 if not self.free_cores: return # Stall

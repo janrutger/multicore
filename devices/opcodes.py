@@ -35,6 +35,10 @@ class Op(IntEnum):
     STACK = 92
     USTACK= 93
 
+    SHIFTL   = 43
+    ROTL32   = 44
+    SM32_RND = 45
+
     # --- FORMAT: TWO_REG_REG ---
     LD    = 30 
     ADD   = 50      # Implemented 
@@ -43,7 +47,9 @@ class Op(IntEnum):
     MOD   = 65      # Implemented
     TSTE  = 71      # Implemented
     TSTG  = 72
-    XOR   = 42      # Implemented
+
+    XOR    = 42      # Implemented
+    
 
     # --- FORMAT: ONE_REG ---
     PUSH  = 90
@@ -56,7 +62,7 @@ FORMAT_ZERO        = {Op.HALT, Op.RET, Op.EI, Op.DI, Op.RTI}
 FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.CALL, Op.CALLX, Op.INT}
 FORMAT_ONE_REG     = {Op.PUSH, Op.POP, Op.GPU, Op.CALLS}
 FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.TSTE, Op.TSTG, Op.XOR}
-FORMAT_TWO_REG_VAL = {Op.LDI, Op.LDM, Op.LDX, Op.STO, Op.STX, Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI}
+FORMAT_TWO_REG_VAL = {Op.LDI, Op.LDM, Op.LDX, Op.STO, Op.STX, Op.SHIFTL, Op.ROTL32, Op.SM32_RND, Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI}
 
 class Reg(IntEnum):
     I  = 0  # Index Register (Vaste hardware-koppeling voor LDX/STX)
@@ -95,7 +101,10 @@ MICROCODE_ROM = {
     'cmpgt':  ['valid_v', 'valid_w', 'cmpgt', 'setResult'],
     'cmplt':  ['valid_v', 'valid_w', 'cmplt', 'setResult'],
 
-    'xor_vw': ['valid_v', 'valid_w', 'xor_vw','setResult'],
+    'xor_vw': ['valid_v', 'valid_w', 'xor_vw',   'setResult'],
+    'shftl':  ['valid_v', 'mv_tw',   'shftl_vw', 'setResult'],
+    'rol32':  ['valid_v', 'mv_tw',   'rol32_vw', 'setResult'],
+
 
    'slow_mul': [
         'valid_v',             # 0: Wacht op A en onthoud teken
@@ -146,7 +155,21 @@ MICROCODE_ROM = {
         ('bra_always', -3),# 12: Spring -3 terug naar cmplt (index 9)
         
         'setResult'        # 13: Meld aan de CPU dat we VALID zijn
-    ]
+    ],
+
+
+    'sm32_rnd': [
+        'valid_v',         # 0: Wacht op invoer V
+        'mv_tw',           # 1: Laad de immediate integer (bijv. 7) in W
+        
+        # --- HARDWARE SHUFFLE ---
+        #'shftl_vw',        # 2: V = V << W (Shift de sleutel met 7)
+        'rol32_vw', 
+        'add',             # 3: V = V + W  (Tel de mixer-waarde 7 erbij op)
+        'rol32_vw',        # 4: V = V ROL32 W (Roteer het resultaat nogmaals met 7)
+        
+        'setResult'        # 5: Klaar!
+    ],
 }
 
 
@@ -167,9 +190,204 @@ MICROCODE_ROM = {
 
 # lets write the encrypt and decrypt method
 # total 1024 main memory 
+# encrypt_program = """
+#     LDI M 251           ; Value of the master key
+#     STO M 512           ; Store masterkey at 512
+
+#     LDI I 0             ; zet de index register
+#     LDI X 1             ; zet de stap grote
+    
+#     LDI C 72            ; 'H'
+#     STX C 520
+#     ADD I X
+#     LDI C 101           ; 'e'
+#     STX C 520
+#     ADD I X
+#     LDI C 108           ; 'l'
+#     STX C 520
+#     ADD I X
+#     LDI C 108           ; 'l'
+#     STX C 520
+#     ADD I X
+#     LDI C 111           ; 'o'
+#     STX C 520
+#     ADD I X
+#     LDI C 32            ; ' ' (Spatie) 32
+#     STX C 520
+#     ADD I X
+#     LDI C 119           ; 'w'
+#     STX C 520
+#     ADD I X
+#     LDI C 111           ; 'o'
+#     STX C 520
+#     ADD I X
+#     LDI C 114           ; 'r'
+#     STX C 520
+#     ADD I X
+#     LDI C 108           ; 'l'
+#     STX C 520
+#     ADD I X
+#     LDI C 100           ; 'd'
+#     STX C 520
+#     ADD I X
+    
+#     LDI C 0             ; Null-terminator (Einde van het bericht)
+#     STX C 520
+#     ADD I X
+    
+
+
+
+#     ; create the PIN-code signature by adding the char values of the message
+#     ; Store de PIN-code in 513
+#     ; ==========================================================
+#     ;  DE LUS: BEREKEN PIN-CODE SIGNATURE VANAF ADRES 520 TILL 0
+#     ; ==========================================================
+#         LDI I 0             ; Reset index register naar begin van de string (0)
+#         LDI A 0             ; Register A wordt onze PIN-code accumulator
+#         LDI Z 0             ; Register Z houden we op 0 voor de terminator-check
+
+#     PIN_LOOP:
+#         LDX C 520           ; Laad het karakter op (520 + I) in register C
+#         TSTE C Z            ; Is het geladen karakter gelijk aan 0 (Null-terminator)?
+#         JMPT PIN_DONE       ; JA? Dan zijn we klaar met de string! Spring uit de lus.
+
+#         ADD A C             ; NEE? Tel de ASCII-waarde van het karakter op bij A
+#         ADD I X             ; Verhoog de index I met stapgrootte X (1)
+#         JMP PIN_LOOP        ; Spring terug naar het begin van de lus
+
+#     PIN_DONE:
+#         STO A 513           ; Store de uiteindelijke PIN-code in 513
+
+#     ; --- HASH FUNCTIE: Hash(MasterKey, PIN) ---
+#     ; Gebruik Register M (512) en A (513)
+#         LDM M 512           ; M = Master Key
+#         LDM A 513           ; A = PIN-code Checksum
+
+#         ; --- EENVOUDIGE MIX-OPERATIE ---
+#         ; We willen: Hash = (M XOR A) + (M ROL 3) of iets dergelijks
+#         ; Omdat we geen ROL (Rotate Left) hebben, gebruiken we vermenigvuldiging
+        
+#         ; LDI B 31            ; Een priemgetal als "mixer" voor spreiding
+#         ; MUL M B             ; M = M * 31 (Dit zorgt voor een bit-shift effect)
+        
+#         XOR M A             ; Stap 1: Meng de PIN-code direct met de Master Key
+#         ROTL32 M 7          ; Stap 2: Roteer de hele boel 7 bits naar links (breekt patronen op)
+#         SHIFTL A 3          ; Stap 3: Geef de PIN een extra shift-offset van 3 bits
+#         ADD M A             ; Stap 4: Smelt de twee gemanipuleerde waarden samen
+        
+#         ; Store de uiteindelijke Hash
+#         STO M 514           ; Sla de hash op in adres 514
+        
+#     ; ==========================================================
+#     ;  GEOPTIMALISEERDE ENCRYPTIE LUS: DATA (520+I) XOR HASH -> (532+I)
+#     ; ==========================================================
+#         LDM K 514           ; K = Hash (de encryptie-sleutel)
+#         LDI I 0             ; Reset index I naar 0
+#         LDI Z 0             ; Nul-waarde voor terminator-check
+#         LDI X 1             ; Stapgrootte 1
+
+#     ENCRYPT_LOOP:
+#         LDX C 520           ; C = Geheugen[520 + I]
+        
+#         ; Test op de null-terminator
+#         TSTE C Z            ; Vergelijk C met 0
+#         JMPT ENCRYPT_DONE   ; Als nul, stop
+        
+#         ; De XOR operatie
+#         XOR C K             ; C = C XOR K
+#         ; Opslaan op de nieuwe locatie (offset 532)
+#         STX C 532           ; Geheugen[532 + I] = C
+
+#         ; --- PROTOCOL ROLL ---
+#         ; De Ucore voert de shift-mix logica uit op Register K met shift-grootte 7.
+#         ; K krijgt een nieuwe unieke waarde voor het volgende karakter.
+#         SM32_RND K 7
+        
+#         ; Ophogen van index
+#         ADD I X             ; I = I + 1
+        
+#         JMP ENCRYPT_LOOP    ; Terug naar start
+
+#     ENCRYPT_DONE:
+
+#     ; For debugging, change the pincode here
+#     ; LDI Y 999
+#     ; STO Y 513
+
+
+
+
+#     ; --- HASH FUNCTIE: Hash(MasterKey, PIN) ---
+#     ; Gebruik Register M (512) en A (513)
+#         LDM M 512           ; M = Master Key
+#         LDM A 513           ; A = PIN-code Checksum
+
+#         ; --- EENVOUDIGE MIX-OPERATIE ---
+#         ; We willen: Hash = (M XOR A) + (M ROL 3) of iets dergelijks
+#         ; Omdat we geen ROL (Rotate Left) hebben, gebruiken we vermenigvuldiging
+        
+#         ; LDI B 31            ; Een priemgetal als "mixer" voor spreiding
+#         ; MUL M B             ; M = M * 31 (Dit zorgt voor een bit-shift effect)
+        
+#         XOR M A             ; Stap 1: Meng de PIN-code direct met de Master Key
+#         ROTL32 M 7          ; Stap 2: Roteer de hele boel 7 bits naar links (breekt patronen op)
+#         SHIFTL A 3          ; Stap 3: Geef de PIN een extra shift-offset van 3 bits
+#         ADD M A             ; Stap 4: Smelt de twee gemanipuleerde waarden samen
+        
+        
+#         ; Store de uiteindelijke Hash
+#         STO M 514           ; Sla de hash op in adres 514
+
+
+#     ; ==========================================================
+#     ;  DECRYPTIE LUS: DATA (532+I) XOR HASH -> (540+I)
+#     ; ==========================================================
+#         LDM K 514           ; Laad de Hash (de sleutel) opnieuw in K
+#         LDI I 0             ; Reset index I naar 0
+#         LDI Z 0             ; Nul-waarde voor terminator-check
+#         LDI X 1             ; Step-size
+
+#     DECRYPT_LOOP:
+#         LDX C 532           ; C = Versleutelde data uit [532+I]
+        
+#         ; Test op de null-terminator (we verwachten dat die er nog steeds staat)
+#         TSTE C Z            
+#         JMPT DECRYPT_DONE   
+        
+#         ; De XOR operatie (draait de encryptie exact terug)
+#         XOR C K             
+#         ; Opslaan op de nieuwe locatie (de gedecodeerde string komt op 544)
+#         STX C 544       
+
+#         ; --- PROTOCOL ROLL ---
+#         ; De Ucore voert de shift-mix logica uit op Register K met shift-grootte 7.
+#         ; K krijgt een nieuwe unieke waarde voor het volgende karakter.
+#         SM32_RND K 7     
+                    
+#         ADD I X             ; I++
+        
+#         JMP DECRYPT_LOOP    
+
+#     DECRYPT_DONE:
+
+
+#         HALT
+# """
+
 encrypt_program = """
-    LDI M 251           ; Value of the master key
+    LDI M 287454020           ; Value of the master key
     STO M 512           ; Store masterkey at 512
+
+    ; ==========================================================
+    ;  3 HARDWARE RUIS-BYTES (SALT / IV) - VERANDER DIT PER BERICHT!
+    ; ==========================================================
+    LDI B 142           ; Ruis byte 1
+    STO B 516           ; Openlijk op 516 voor de ontvanger
+    LDI B 19            ; Ruis byte 2
+    STO B 517           ; Openlijk op 517 voor de ontvanger
+    LDI B 203           ; Ruis byte 3
+    STO B 518           ; Openlijk op 518 voor de ontvanger
 
     LDI I 0             ; zet de index register
     LDI X 1             ; zet de stap grote
@@ -213,10 +431,6 @@ encrypt_program = """
     ADD I X
     
 
-
-
-    ; create the PIN-code signature by adding the char values of the message
-    ; Store de PIN-code in 513
     ; ==========================================================
     ;  DE LUS: BEREKEN PIN-CODE SIGNATURE VANAF ADRES 520 TILL 0
     ; ==========================================================
@@ -237,27 +451,29 @@ encrypt_program = """
         STO A 513           ; Store de uiteindelijke PIN-code in 513
 
     ; --- HASH FUNCTIE: Hash(MasterKey, PIN) ---
-    ; Gebruik Register M (512) en A (513)
         LDM M 512           ; M = Master Key
         LDM A 513           ; A = PIN-code Checksum
-
-        ; --- EENVOUDIGE MIX-OPERATIE ---
-        ; We willen: Hash = (M XOR A) + (M ROL 3) of iets dergelijks
-        ; Omdat we geen ROL (Rotate Left) hebben, gebruiken we vermenigvuldiging
         
-        LDI B 31            ; Een priemgetal als "mixer" voor spreiding
-        MUL M B             ; M = M * 31 (Dit zorgt voor een bit-shift effect)
+        XOR M A             ; Stap 1: Meng de PIN-code direct met de Master Key
+        ROTL32 M 7          ; Stap 2: Roteer de hele boel 7 bits naar links
+        SHIFTL A 3          ; Stap 3: Geef de PIN een extra shift-offset van 3 bits
+        ADD M A             ; Stap 4: Smelt de twee gemanipuleerde waarden samen
         
-        ; Nu de PIN erbij mengen
-        ADD M A             ; Voeg de PIN toe aan de gemixte Master Key
-        
-        ; Store de uiteindelijke Hash
         STO M 514           ; Sla de hash op in adres 514
         
     ; ==========================================================
-    ;  GEOPTIMALISEERDE ENCRYPTIE LUS: DATA (520+I) XOR HASH -> (532+I)
+    ;  ENCRYPTIE: EERST DE GENERATOR 3X KICKEN MET RUIS, DAN DE LUS
     ; ==========================================================
-        LDM K 514           ; K = Hash (de encryptie-sleutel)
+        LDM K 514           ; K = Basis-hash (de start-sleutel)
+
+        ; --- DE 3-BYTE RUIS-KICK (PRE-SHUFFLE) ---
+        LDM B 516           ; Haal ruis 1 op
+        SM32_RND K B        ; Kick 1!
+        LDM B 517           ; Haal ruis 2 op
+        SM32_RND K B        ; Kick 2!
+        LDM B 518           ; Haal ruis 3 op
+        SM32_RND K B        ; Kick 3! K staat nu op een bizar, onvoorspelbaar startpunt.
+
         LDI I 0             ; Reset index I naar 0
         LDI Z 0             ; Nul-waarde voor terminator-check
         LDI X 1             ; Stapgrootte 1
@@ -265,53 +481,49 @@ encrypt_program = """
     ENCRYPT_LOOP:
         LDX C 520           ; C = Geheugen[520 + I]
         
-        ; Test op de null-terminator
         TSTE C Z            ; Vergelijk C met 0
         JMPT ENCRYPT_DONE   ; Als nul, stop
         
-        ; De XOR operatie
-        XOR C K             ; C = C XOR K
-        
-        ; Opslaan op de nieuwe locatie (offset 532)
+        XOR C K             ; C = C XOR K (CPU stalt hier automatisch als K nog werkt!)
         STX C 532           ; Geheugen[532 + I] = C
+
+        SM32_RND K 7        ; Binnen de lus rollen we supersnel door met vaste constante 7!
         
-        ; Ophogen van index
         ADD I X             ; I = I + 1
-        
         JMP ENCRYPT_LOOP    ; Terug naar start
 
     ENCRYPT_DONE:
 
-    ; For debugging, change the pincode here
+
+    ; For debugging, change the pincode and/or mastercode here
     ; LDI Y 999
-    ; STO Y 513
-
-
-
-
-    ; --- HASH FUNCTIE: Hash(MasterKey, PIN) ---
-    ; Gebruik Register M (512) en A (513)
-        LDM M 512           ; M = Master Key
-        LDM A 513           ; A = PIN-code Checksum
-
-        ; --- EENVOUDIGE MIX-OPERATIE ---
-        ; We willen: Hash = (M XOR A) + (M ROL 3) of iets dergelijks
-        ; Omdat we geen ROL (Rotate Left) hebben, gebruiken we vermenigvuldiging
-        
-        LDI B 31            ; Een priemgetal als "mixer" voor spreiding
-        MUL M B             ; M = M * 31 (Dit zorgt voor een bit-shift effect)
-        
-        ; Nu de PIN erbij mengen
-        ADD M A             ; Voeg de PIN toe aan de gemixte Master Key
-        
-        ; Store de uiteindelijke Hash
-        STO M 514           ; Sla de hash op in adres 514
+    ; STO Y 513       ; corrupt the pincode
+    ; LDI Y 173
+    ; STO Y 512       ; guess the mastercode
+    
+    ; --- RE-HASH FOR DECRYPTOR ---
+        LDM M 512           
+        LDM A 513           
+        XOR M A             
+        ROTL32 M 7          
+        SHIFTL A 3          
+        ADD M A             
+        STO M 514           
 
 
     ; ==========================================================
-    ;  DECRYPTIE LUS: DATA (532+I) XOR HASH -> (540+I)
+    ;  DECRYPTIE: EXACT DEZELFDE 3 KICKS VÓÓR DE LUS START
     ; ==========================================================
-        LDM K 514           ; Laad de Hash (de sleutel) opnieuw in K
+        LDM K 514           ; Laad de Hash opnieuw in K
+
+        ; --- DE 3-BYTE RUIS-KICK VOOR DE ONTVANGER ---
+        LDM B 516           ; Grijp openbare ruis 1
+        SM32_RND K B        ; Kick 1
+        LDM B 517           ; Grijp openbare ruis 2
+        SM32_RND K B        ; Kick 2
+        LDM B 518           ; Grijp openbare ruis 3
+        SM32_RND K B        ; Kick 3 (Ontvanger loopt weer 100% synchroon)
+
         LDI I 0             ; Reset index I naar 0
         LDI Z 0             ; Nul-waarde voor terminator-check
         LDI X 1             ; Step-size
@@ -319,22 +531,18 @@ encrypt_program = """
     DECRYPT_LOOP:
         LDX C 532           ; C = Versleutelde data uit [532+I]
         
-        ; Test op de null-terminator (we verwachten dat die er nog steeds staat)
         TSTE C Z            
         JMPT DECRYPT_DONE   
         
-        ; De XOR operatie (draait de encryptie exact terug)
-        XOR C K             
-        
-        ; Opslaan op de nieuwe locatie (de gedecodeerde string komt op 544)
-        STX C 544            
+        XOR C K             ; (CPU stalt ook hier puur op de hardware-interlock van K)
+        STX C 544           ; De gedecodeerde string komt op 544       
+
+        SM32_RND K 7        ; Rol synchroon door met constante 7
                     
         ADD I X             ; I++
-        
         JMP DECRYPT_LOOP    
 
     DECRYPT_DONE:
-
 
         HALT
 """
@@ -408,41 +616,37 @@ encrypt_program = """
 
 assembly_program = """ 
     ;
-        LDI A 1
-        LDI B 2
-        LDI C -3
-        LDI K 4
-        LDI L 5
-        LDI M 6
-        LDI Y 7
-        LDI X 8
-        LDI Z 9
+; ==========================================================
+;  TESTPROGRAMMA: SHIFTL EN ROTL32 HARDWARE VERIFICATIE
+; ==========================================================
+    ; --- DEEL 1: SHIFTL TEST (8-bits overflow check) ---
+    LDI A 15            ; Laad getal 15 (binair: 0000 1111) in Register A
+    SHIFTL A 4          ; Verschuif 4 posities links -> (binair: 1111 0000 = decimaal 240)
+    STO A 520           ; Sla resultaat op op adres 100. Verwacht: 240
 
-        MUL A B
-        MUL A B
-        MUL A B
-        MUL A B
-        MUL A B
+    LDI A 240           ; Laad getal 240 (binair: 1111 0000) opnieuw
+    SHIFTL A 4          ; Verschuif nogmaals 4 posities links
+                        ; In een pure 8-bits grens zou dit 0 worden, maar omdat
+                        ; shftl_vw oneindig doorwerkt verwachten we hier:
+                        ; binair: 1111 0000 0000 = decimaal 3840
+    STO A 521           ; Sla op op adres 101. Verwacht: 3840
 
-        MUL A B
-        MUL A B
-        MUL A B
-        MUL A B
-        MUL A B
-        
-        MUL A B
-        MUL A B
-        MUL A B
-        MUL A B
-        MUL A B
+    ; --- DEEL 2: ROTL32 TEST (32-bits boundary wrap-around) ---
+    LDI B 1             ; Laad getal 1 (binair: 31 nullen en een 1 helemaal rechts)
+    ROTL32 B 1          ; Roteer 1 positie naar links
+    STO B 522           ; Sla op op adres 102. Verwacht: 2
 
-        MUL A B
-        MUL A B
-        MUL A B
-        MUL A B
-        MUL A B
-        
+    ; Nu de ultieme test: we zetten een bit aan de linkerkant van het 32-bits venster
+    ; Hexadecimaal 0x80000000 is decimaal 2147483648 (de allerhoogste bit staat aan)
+    LDI B 2147483648    ; Hoogste bit (bit 31) is 1, de rest is 0
+    ROTL32 B 1          ; Roteer 1 positie naar links. 
+                        ; Die linker bit MOET er nu aan de rechterkant (bit 0) weer inrollen!
+    STO B 523           ; Sla op op adres 103. Verwacht: 1 (de bit is rond gegaan!)
 
-        
-        HALT
+    ; --- DEEL 3: COMBINATIE TEST (Crypto-stijl mixing) ---
+    LDI C 72            ; ASCII 'H' (binair: 0100 1000)
+    ROTL32 C 8          ; Roteer 8 posities naar links -> schuift naar het tweede byte
+    STO C 524           ; Sla op op adres 104. Verwacht: 18432
+
+    HALT                ; Beëindig de simulatie en stop alle cores
         """
