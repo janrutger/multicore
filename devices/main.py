@@ -15,8 +15,8 @@ def run_test():
 
 
     # De assembler doet nu al het rekenwerk voor je!
-    # test_program = assemble(encrypt_program)        # the source can be found in opcodes.py
-    test_program = assemble(assembly_program)  
+    test_program = assemble(encrypt_program)        # the source can be found in opcodes.py
+    # test_program = assemble(assembly_program)  
     
     # Print even ter controle de gegenereerde machinecode integers
     print(f"Gegenereerde machinecode: {test_program}\n")
@@ -98,11 +98,11 @@ def run_test():
     # === NIEUW: Print de databuffer vanaf 512 (Masterkey + Encrypted String) ===
     # === GEHEUGEN DUMP (Consistent vanaf 512 voor 24 adressen) ===
     print("==========================================================")
-    print("             GEHEUGEN DUMP (Adres 512 t/m 535)            ")
+    print("             GEHEUGEN DUMP (Adres 512 t/m )            ")
     print("==========================================================")
     
     start_adres = 512
-    aantal_adressen = 24
+    aantal_adressen = 50
     
     for i in range(aantal_adressen):
         current_addr = start_adres + i

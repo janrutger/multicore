@@ -4,26 +4,26 @@ from enum import IntEnum
 class Op(IntEnum):
     # --- FORMAT: ZERO ---
     NOP   = 10
-    HALT  = 11
+    HALT  = 11      # Implemented
     RET   = 12
     EI    = 13
     DI    = 14
     RTI   = 15
 
     # --- FORMAT: ONE_ADDR ---
-    JMPF  = 20
-    JMPT  = 21
-    JMP   = 22
+    JMPF  = 20      # Implemented
+    JMPT  = 21      # Implemented
+    JMP   = 22      # Implemented
     CALL  = 24
     CALLX = 25
     INT   = 26
 
     # --- FORMAT: TWO_REG_VAL / TWO_REG_ADDR --- 
-    LDI   = 31
-    LDM   = 32
-    LDX   = 33
-    STO   = 40
-    STX   = 41
+    LDI   = 31      # Implemented
+    LDM   = 32      # Implemented
+    LDX   = 33      # Implemented
+    STO   = 40      # Implemented
+    STX   = 41      # Implemented
     ADDI  = 51
     SUBI  = 53
     MULI  = 61
@@ -37,13 +37,13 @@ class Op(IntEnum):
 
     # --- FORMAT: TWO_REG_REG ---
     LD    = 30 
-    ADD   = 50  
+    ADD   = 50      # Implemented 
     SUB   = 52
-    MUL   = 60
-    MOD   = 65
-    TSTE  = 71
+    MUL   = 60      # Implemented
+    MOD   = 65      # Implemented
+    TSTE  = 71      # Implemented
     TSTG  = 72
-    XOR   = 42
+    XOR   = 42      # Implemented
 
     # --- FORMAT: ONE_REG ---
     PUSH  = 90
@@ -74,8 +74,9 @@ class Reg(IntEnum):
 
 
 
-# ucode instructions
-
+# ucode instructions rom
+# ucode instruction map to ucore primitives
+# ucode instructions are called by de CPU intructionn(dispatch)
 MICROCODE_ROM = {
     'ldv':    ['mv_tv',  'setResult'],
     'stv':    ['mv_vt',  'setResult'],
@@ -153,15 +154,15 @@ MICROCODE_ROM = {
 
 
 # some assembly programming here to keep main.py clear and redeble
-assembly_program = """ 
-        ; --- XOR TEST PROGRAMMA ---
-            LDI K 487          ; value of the master key
-            LDI C 72           ; Laad data (72) in register C
+# assembly_program = """ 
+#         ; --- XOR TEST PROGRAMMA ---
+#             LDI K 487          ; value of the master key
+#             LDI C 72           ; Laad data (72) in register C
 
-            XOR C K            ; D = D ^ M
-            STO C 520          ; Sla resultaat terug op in geheugen
-            HALT
-            """
+#             XOR C K            ; D = D ^ M
+#             STO C 520          ; Sla resultaat terug op in geheugen
+#             HALT
+#             """
 
 
 # lets write the encrypt and decrypt method
@@ -253,6 +254,88 @@ encrypt_program = """
         ; Store de uiteindelijke Hash
         STO M 514           ; Sla de hash op in adres 514
         
+    ; ==========================================================
+    ;  GEOPTIMALISEERDE ENCRYPTIE LUS: DATA (520+I) XOR HASH -> (532+I)
+    ; ==========================================================
+        LDM K 514           ; K = Hash (de encryptie-sleutel)
+        LDI I 0             ; Reset index I naar 0
+        LDI Z 0             ; Nul-waarde voor terminator-check
+        LDI X 1             ; Stapgrootte 1
+
+    ENCRYPT_LOOP:
+        LDX C 520           ; C = Geheugen[520 + I]
+        
+        ; Test op de null-terminator
+        TSTE C Z            ; Vergelijk C met 0
+        JMPT ENCRYPT_DONE   ; Als nul, stop
+        
+        ; De XOR operatie
+        XOR C K             ; C = C XOR K
+        
+        ; Opslaan op de nieuwe locatie (offset 532)
+        STX C 532           ; Geheugen[532 + I] = C
+        
+        ; Ophogen van index
+        ADD I X             ; I = I + 1
+        
+        JMP ENCRYPT_LOOP    ; Terug naar start
+
+    ENCRYPT_DONE:
+
+    ; For debugging, change the pincode here
+    ; LDI Y 999
+    ; STO Y 513
+
+
+
+
+    ; --- HASH FUNCTIE: Hash(MasterKey, PIN) ---
+    ; Gebruik Register M (512) en A (513)
+        LDM M 512           ; M = Master Key
+        LDM A 513           ; A = PIN-code Checksum
+
+        ; --- EENVOUDIGE MIX-OPERATIE ---
+        ; We willen: Hash = (M XOR A) + (M ROL 3) of iets dergelijks
+        ; Omdat we geen ROL (Rotate Left) hebben, gebruiken we vermenigvuldiging
+        
+        LDI B 31            ; Een priemgetal als "mixer" voor spreiding
+        MUL M B             ; M = M * 31 (Dit zorgt voor een bit-shift effect)
+        
+        ; Nu de PIN erbij mengen
+        ADD M A             ; Voeg de PIN toe aan de gemixte Master Key
+        
+        ; Store de uiteindelijke Hash
+        STO M 514           ; Sla de hash op in adres 514
+
+
+    ; ==========================================================
+    ;  DECRYPTIE LUS: DATA (532+I) XOR HASH -> (540+I)
+    ; ==========================================================
+        LDM K 514           ; Laad de Hash (de sleutel) opnieuw in K
+        LDI I 0             ; Reset index I naar 0
+        LDI Z 0             ; Nul-waarde voor terminator-check
+        LDI X 1             ; Step-size
+
+    DECRYPT_LOOP:
+        LDX C 532           ; C = Versleutelde data uit [532+I]
+        
+        ; Test op de null-terminator (we verwachten dat die er nog steeds staat)
+        TSTE C Z            
+        JMPT DECRYPT_DONE   
+        
+        ; De XOR operatie (draait de encryptie exact terug)
+        XOR C K             
+        
+        ; Opslaan op de nieuwe locatie (de gedecodeerde string komt op 544)
+        STX C 544            
+                    
+        ADD I X             ; I++
+        
+        JMP DECRYPT_LOOP    
+
+    DECRYPT_DONE:
+
+
         HALT
 """
 
@@ -322,3 +405,44 @@ encrypt_program = """
     #     MOD A B
     #     HALT
     # """
+
+assembly_program = """ 
+    ;
+        LDI A 1
+        LDI B 2
+        LDI C -3
+        LDI K 4
+        LDI L 5
+        LDI M 6
+        LDI Y 7
+        LDI X 8
+        LDI Z 9
+
+        MUL A B
+        MUL A B
+        MUL A B
+        MUL A B
+        MUL A B
+
+        MUL A B
+        MUL A B
+        MUL A B
+        MUL A B
+        MUL A B
+        
+        MUL A B
+        MUL A B
+        MUL A B
+        MUL A B
+        MUL A B
+
+        MUL A B
+        MUL A B
+        MUL A B
+        MUL A B
+        MUL A B
+        
+
+        
+        HALT
+        """
