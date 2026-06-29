@@ -466,13 +466,17 @@ encrypt_program = """
     ; ==========================================================
         LDM K 514           ; K = Basis-hash (de start-sleutel)
 
-        ; --- DE 3-BYTE RUIS-KICK (PRE-SHUFFLE) ---
-        LDM B 516           ; Haal ruis 1 op
-        SM32_RND K B        ; Kick 1!
-        LDM B 517           ; Haal ruis 2 op
-        SM32_RND K B        ; Kick 2!
-        LDM B 518           ; Haal ruis 3 op
-        SM32_RND K B        ; Kick 3! K staat nu op een bizar, onvoorspelbaar startpunt.
+        LDM B 516           ; Grijp openbare ruis 1 (bijv. een random 32-bit getal)
+        ADD K B             ; Meng de ruis direct in de status van K
+        SM32_RND K 7        ; Kick 1: Roteer en mix met vaste constante 7
+
+        LDM B 517           ; Grijp openbare ruis 2
+        ADD K B             ; Meng ruis 2 in K
+        SM32_RND K 7        ; Kick 2: Roteer en mix weer
+
+        LDM B 518           ; Grijp openbare ruis 3
+        ADD K B             ; Meng ruis 3 in K
+        SM32_RND K 7        ; Kick 3: De ultieme synchronisatie-shake
 
         LDI I 0             ; Reset index I naar 0
         LDI Z 0             ; Nul-waarde voor terminator-check
@@ -516,13 +520,17 @@ encrypt_program = """
     ; ==========================================================
         LDM K 514           ; Laad de Hash opnieuw in K
 
-        ; --- DE 3-BYTE RUIS-KICK VOOR DE ONTVANGER ---
-        LDM B 516           ; Grijp openbare ruis 1
-        SM32_RND K B        ; Kick 1
+        LDM B 516           ; Grijp openbare ruis 1 (bijv. een random 32-bit getal)
+        ADD K B             ; Meng de ruis direct in de status van K
+        SM32_RND K 7        ; Kick 1: Roteer en mix met vaste constante 7
+
         LDM B 517           ; Grijp openbare ruis 2
-        SM32_RND K B        ; Kick 2
+        ADD K B             ; Meng ruis 2 in K
+        SM32_RND K 7        ; Kick 2: Roteer en mix weer
+
         LDM B 518           ; Grijp openbare ruis 3
-        SM32_RND K B        ; Kick 3 (Ontvanger loopt weer 100% synchroon)
+        ADD K B             ; Meng ruis 3 in K
+        SM32_RND K 7        ; Kick 3: De ultieme synchronisatie-shake
 
         LDI I 0             ; Reset index I naar 0
         LDI Z 0             ; Nul-waarde voor terminator-check
