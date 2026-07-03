@@ -137,7 +137,7 @@ class Ucore:
             self.work = self.transfer
             self.upc += 1
 
-        elif uinstruction == 'mv_vw':
+        elif uinstruction == 'mv_wv':
             self.value = self.work      # Destination = Value, Source = Work
             self.upc += 1
 
@@ -252,6 +252,10 @@ class Ucore:
         elif uinstruction == 'dec_v':
             self.value -= 1
             self.upc += 1
+
+        elif uinstruction == 'inc_v':
+            self.value += 1
+            self.upc +=1
 
         elif uinstruction == 'add_tw':
             # De pure accumulator actie: tel W op bij T

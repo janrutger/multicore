@@ -194,6 +194,26 @@ class CPU:
                 self.registers[reg1] = core_id
                 self.last_active_core = core_id
 
+            elif opcode == Op.INC:
+                if not self.free_cores: return # stall
+                core_id = self.free_cores.popleft()
+
+                src1_core = self.registers[reg1]
+
+                self.cores[core_id].dispatch('inc', arg1=src1_core, arg2=None)
+                self.registers[reg1] = core_id
+                self.last_active_core = core_id
+
+            elif opcode == Op.DEC:
+                if not self.free_cores: return # stall
+                core_id = self.free_cores.popleft()
+
+                src1_core = self.registers[reg1]
+
+                self.cores[core_id].dispatch('dec', arg1=src1_core, arg2=None)
+                self.registers[reg1] = core_id
+                self.last_active_core = core_id
+
             elif opcode == Op.MOD:
                 if not self.free_cores: return # Stall
                 core_id = self.free_cores.popleft()

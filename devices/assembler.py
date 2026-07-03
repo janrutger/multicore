@@ -68,6 +68,20 @@ def assemble(source_code: str) -> list:
             machine_code.append(val)
             continue
 
+        # === FORMAT: ONE_REG (Bijv: INC K of DEC A) ===
+        if mnemonic in ['INC', 'DEC']:
+            reg1_str = parts[1].upper()
+            if reg1_str not in REGISTERS:
+                raise SyntaxError(f"Onbekend register '{reg1_str}' op adres {current_address}")
+            reg1 = REGISTERS[reg1_str]
+            
+            # Formaatopbouw voor ONE_REG: we stoppen het registernummer op de plek van reg1.
+            # Afhankelijk van hoe je decoder in cpu.py dit verwacht (bijv. (reg1 * 100) + opcode 
+            # of (reg1 * 10) + opcode. Gezien je andere formaten is reg1 meestal de eenheid/tiental voor de opcode):
+            val = reg1 * 100 + opcode  # Verander dit naar jouw specifieke bit/integer layout shift!
+            machine_code.append(val)
+            continue
+
         # FORMAT: TWO_REG_VAL / TWO_REG_ADDR / TWO_REG_REG
         # (Bijv: LDI A 42 of TSTE A B of STO A 100)
         reg1_str = parts[1].upper()
