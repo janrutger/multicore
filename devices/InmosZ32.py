@@ -5,7 +5,8 @@ from collections import deque
 from memory import Memory
 from ucore  import Ucore
 
-from ExecuterZ32 import _execute_cycleZ32
+from ExecuterZ32 import _execute_cycleZ32 
+from ExecuterZ32 import HardwareContext
 
 # Importeer de STERN-boekhouding uit het andere bestand
 from opcodes import Op, FORMAT_ZERO, FORMAT_ONE_ADDR, FORMAT_ONE_REG, FORMAT_TWO_REG_REG, FORMAT_TWO_REG_VAL
@@ -31,6 +32,8 @@ class CPU:
         self.PC  = 0                           # Program counter
         self.SP  = self.memory.memSize() - 1   # Stackpointer
         self.status = 1                        # Status flag is true
+
+        self.contexts = []                     # <-- De order-safe lijst voor actieve threads
 
         self.fsm_state = 'FETCH'             # FETCH, DECODE, EXECUTE
         self.MIR       = None                # Memory Instruction Register (onze huidige integer)
@@ -77,8 +80,26 @@ class CPU:
                         core.coreStatus = 'IDLE'
 
 
-            # 2. Voer DAARNA de huidige hoofd-CPU instructie uit
-            self._execute_cycle(self)
+            # 2. CONTEXT SCHEDULER: Tik exact ÉÉN actieve context aan die RUNNING is
+            active_running_contexts = [c for c in self.contexts if c.fsm_state in ('FETCH', 'DECODE', 'EXECUTE', 'RUNNING')]
+            
+            if active_running_contexts:
+                # Veiligheidsmarge: mocht de lijst gekrompen zijn, zorg dat we nooit Out-of-Bounds gaan
+                if self.current_context_index >= len(active_running_contexts):
+                    self.current_context_index = 0
+                    
+                # Pak de context die nu gegarandeerd aan de beurt is
+                target_context = active_running_contexts[self.current_context_index]
+                
+                # Voer de FSM-stap uit voor deze specifieke context
+                self._execute_cycle(self, target_context)
+                
+                # Schuif de pointer door naar de volgende context EN pas direct modulo toe 
+                # zodat de waarde direct klopt en opgeslagen wordt voor de volgende tick.
+                self.current_context_index = (self.current_context_index + 1) % len(active_running_contexts)
+
+            # 3. Voer DAARNA de huidige hoofd-CPU instructie uit
+            self._execute_cycle(self, self)
 
 
 
