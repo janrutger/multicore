@@ -10,6 +10,8 @@ class Op(IntEnum):
     DI    = 14
     RTI   = 15
 
+    CLOSE = 29
+
     # --- FORMAT: ONE_ADDR ---
     JMPF  = 20      # Implemented
     JMPT  = 21      # Implemented
@@ -32,6 +34,9 @@ class Op(IntEnum):
     ANDI  = 82
     STACK = 92
     USTACK= 93
+
+    CONTEXT = 27
+    JOIN    = 28
 
     SHIFTL   = 43      # Implemented
     ROTL32   = 44      # Implemented
@@ -58,11 +63,11 @@ class Op(IntEnum):
     DEC   = 81     # Implemented
 
 # Vaste sets voor de decoder om snel het format te matchen
-FORMAT_ZERO        = {Op.HALT, Op.RET, Op.EI, Op.DI, Op.RTI}
+FORMAT_ZERO        = {Op.HALT, Op.RET, Op.EI, Op.DI, Op.RTI, Op.CLOSE}
 FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.CALL, Op.CALLX, Op.INT}
 FORMAT_ONE_REG     = {Op.PUSH, Op.POP, Op.GPU, Op.CALLS, Op.INC, Op.DEC}
 FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.TSTE, Op.TSTG, Op.XOR}
-FORMAT_TWO_REG_VAL = {Op.LDI, Op.LDM, Op.LDX, Op.STO, Op.STX, Op.SHIFTL, Op.ROTL32, Op.SM32_RND, Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI}
+FORMAT_TWO_REG_VAL = {Op.LDI, Op.LDM, Op.LDX, Op.STO, Op.STX, Op.SHIFTL, Op.ROTL32, Op.SM32_RND, Op.CONTEXT, Op.JOIN, Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI}
 
 class Reg(IntEnum):
     I  = 0  # Index Register (Vaste hardware-koppeling voor LDX/STX)
@@ -425,12 +430,14 @@ context_test = """
 
     ; Start de parallelle thread! 
     ; Register A (waarde 55) wordt meegegeven als start-uCore.
-    ; Het startadres van de thread-code begint exact op Adres 11.
-    CONTEXT A 11        ; Adres 4: Lanceer THREAD_START op PC=11
+    ; Het startadres van de thread-code begint exact op Adres 12.
+    ; CONTEXT A 12        ; Adres 4: Lanceer THREAD_START op PC=12
+    CONTEXT A THREAD_START
 
     ; Terwijl de thread asynchroon draait, doet de hoofd-CPU hier nuttig werk
     LDI B 10            ; Adres 5: R2 (B) = 10
-    MUL B B             ; Adres 6: B = 10 * 10 = 100
+    LDI X 10
+    MUL B X             ; Adres 6: B = 10 * 10 = 100
     STO B 500           ; Adres 7: Sla 100 op op adres 500
 
     ; Jouw geïntegreerde JOIN-lus:
@@ -438,9 +445,10 @@ context_test = """
     ; dan springt de hardware direct terug naar Adres 8 (zichzelf) en faalt de join.
     ; Als de thread WEL klaar is, oogst hij het resultaat in C en loopt de PC door naar 9.
 WAIT_FOR_THREAD:
-    JOIN C 8            ; Adres 8: Probeer te joinen in C. Indien niet klaar, spring naar 8.
+    ; JOIN A 9            ; Adres 8: Probeer te joinen in C. Indien niet klaar, spring naar 8.
+    JOIN A WAIT_FOR_THREAD
 
-    STO C 501           ; Adres 9: Succes! Sla het geoogste thread-resultaat op op 501
+    STO A 514           ; Adres 9: Succes! Sla het geoogste thread-resultaat op op 501
     HALT                ; Adres 10: Hoofd-CPU stopt.
 
     ; ==========================================================
@@ -448,6 +456,265 @@ WAIT_FOR_THREAD:
     ; ==========================================================
 THREAD_START:
     LDI B 5             ; Adres 11: R2 (B) = 5
-    ADD A B             ; Adres 12: R1 (A) = A + B = 55 + 5 = 60
+    MUL A B             ; Adres 12: R1 (A) = A + B = 55 + 5 = 60
     CLOSE               ; Adres 13: Thread is klaar, uCore in A blijft VALID!
+"""
+
+context_test1 = """
+; ==========================================================
+;  HOOFD-CPU: MULTI-CONTEXT STRESS TEST
+; ==========================================================
+    ; Stap 1: Bereid de invoerwaarden voor in registers
+    LDI A 10            ; Thread 1 invoer = 10
+    LDI B 20            ; Thread 2 invoer = 20
+    LDI C 30            ; Thread 3 invoer = 30
+
+    ; Stap 2: Lanceer 3 contexten parallel!
+    ; De assembler lost de labels THREAD_1, THREAD_2, THREAD_3 direct op.
+    CONTEXT A THREAD_1  ; Lanceer Thread 1 (werkt met uCore van A)
+    CONTEXT B THREAD_2  ; Lanceer Thread 2 (werkt met uCore van B)
+    CONTEXT C THREAD_3  ; Lanceer Thread 3 (werkt met uCore van C)
+
+    ; Terwijl er nu 3 uCores tegelijk vechten om de round-robin ticks,
+    ; doet de hoofd-CPU zelf ook nog een flinke achtergrondklus:
+    LDI X 5
+    LDI Y 5
+    MUL X Y             ; X = 5 * 5 = 25
+    STO X 500           ; Sla resultaat van hoofd-CPU op op adres 500
+
+    ; ==========================================================
+    ;  HARDWARE SYNCHRONISATIE BARRIÈRE (The OCCAM Join)
+    ; ==========================================================
+WAIT_T1:
+    JOIN A WAIT_T1      ; Wacht op Thread 1. Indien klaar: oogst resultaat in A.
+    STO A 512           ; Sla resultaat Thread 1 op op adres 512
+
+WAIT_T2:
+    JOIN B WAIT_T2      ; Wacht op Thread 2. Indien klaar: oogst resultaat in B.
+    STO B 513           ; Sla resultaat Thread 2 op op adres 513
+
+WAIT_T3:
+    JOIN C WAIT_T3      ; Wacht op Thread 3. Indien klaar: oogst resultaat in C.
+    STO C 514           ; Sla resultaat Thread 3 op op adres 514
+
+    HALT                ; Volledige systeemstop!
+
+; ==========================================================
+;  PARALLELLE THREAD CODES (Draaien asynchroon)
+; ==========================================================
+THREAD_1:
+    LDI X 5
+    MUL A X             ; A = 10 * 5 = 50 (Zware uCore MUL!)
+    CLOSE               ; Beëindig thread, uCore in A blijft VALID
+
+THREAD_2:
+    LDI X 10
+    MUL B X             ; B = 20 * 10 = 200 (Zware uCore MUL!)
+    CLOSE               ; Beëindig thread, uCore in B blijft VALID
+
+THREAD_3:
+    LDI X 100
+    ADD C X             ; C = 30 + 100 = 130 (Snelle uCore ADD)
+    CLOSE               ; Beëindig thread, uCore in C blijft VALID
+"""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+context_test2 = """
+; ==============================================================================
+;  PARALLEL MATRIX ENCRYPTIE & DECRYPTIE PROGRAMMA (INMOS-Z32 EDITION)
+;  Strategie: Master-CPU geeft karakter (C) mee via CONTEXT en regelt de opslag.
+; ==============================================================================
+
+    LDI M 287454020     ; Master Key
+    STO M 512           ; Sla op op adres 512
+
+    ; Hardware ruis-bytes (Salt / IV)
+    LDI B 142           
+    STO B 516           ; Openlijk op 516 voor de ontvanger
+    LDI B 90            
+    STO B 517           ; Openlijk op 517 voor de ontvanger
+    LDI B 203           
+    STO B 518           ; Openlijk op 518 voor de ontvanger
+
+    ; --- DATA INITIALISATIE (Origineel bericht vanaf adres 520) ---
+    LDI I 0             
+    LDI C 72            ; 'H'
+    STX C 520
+    INC I 
+    LDI C 101           ; 'e'
+    STX C 520
+    INC I 
+    LDI C 108           ; 'l'
+    STX C 520
+    INC I 
+    LDI C 108           ; 'l'
+    STX C 520
+    INC I 
+    LDI C 111           ; 'o'
+    STX C 520
+    INC I 
+    LDI C 32            ; ' ' (Spatie)
+    STX C 520
+    INC I 
+    LDI C 119           ; 'w'
+    STX C 520
+    INC I 
+    LDI C 111           ; 'o'
+    STX C 520
+    INC I 
+    LDI C 114           ; 'r'
+    STX C 520
+    INC I 
+    LDI C 108           ; 'l'
+    STX C 520
+    INC I 
+    LDI C 100           ; 'd'
+    STX C 520
+    INC I 
+    LDI C 0             ; Null-terminator (Einde van het bericht)
+    STX C 520
+
+    ; ==========================================================
+    ;  FASE 1: BEREKEN PIN-CODE SIGNATURE & PRE-SHARES SLEUTEL (SERIEEL)
+    ; ==========================================================
+    LDI I 0             ; Reset index register naar begin van de string (0)
+    LDI A 0             ; Register A wordt onze PIN-code accumulator
+    LDI Z 0             ; Register Z houden we op 0 voor de terminator-check
+
+PIN_LOOP:
+    LDX C 520           ; Laad het karakter op (520 + I) in register C
+    TSTE Z C            ; Is het geladen karakter gelijk aan 0 (Null-terminator)?
+    JMPT PIN_DONE       ; JA? Spring uit de lus.
+
+    ADD A C             ; NEE? Tel de ASCII-waarde op bij A
+    INC I               ; Verhoog de index I
+    JMP PIN_LOOP        
+
+PIN_DONE:
+    STO A 513           ; Store de uiteindelijke PIN-code in 513
+
+    ; --- HASH FUNCTIE: Hash(MasterKey, PIN) ---
+    LDM M 512           ; M = Master Key
+    LDM A 513           ; A = PIN-code Checksum
+    
+    XOR M A             ; Meng de PIN-code met de Master Key
+    ROTL32 M 7          ; Roteer 7 bits naar links
+    SHIFTL A 3          ; Geef de PIN een extra shift-offset van 3 bits
+    ADD M A             ; Smelt de twee waarden samen
+    STO M 514           ; Sla de basis-hash op in adres 514
+    
+    ; --- DE 3 OPENBARE RUIS-KICKS ---
+    LDM K 514           ; K = Basis-hash
+
+    LDM B 516           ; Grijp openbare ruis 1
+    ADD K B             ; Meng de ruis in K
+    SM32_RND K 7        ; Kick 1
+
+    LDM B 517           ; Grijp openbare ruis 2
+    ADD K B             
+    SM32_RND K 7        ; Kick 2
+
+    LDM B 518           ; Grijp openbare ruis 3
+    ADD K B             
+    SM32_RND K 7        ; Kick 3: Volledig gesynchroniseerd!
+
+    STO K 515           ; Sla deze stabiele basis-keystream op op adres 515 voor de workers
+
+
+    ; ==========================================================
+    ;  FASE 2: ENCRYPTIE LUS (MASTER STUURT DATA, WORKER REKENT)
+    ; ==========================================================
+    LDI I 0             ; Reset index I naar 0
+    LDI Z 0             ; Nul-waarde voor terminator-check
+
+ENCRYPT_LOOP:
+    LDX C 520           ; C = Geheugen[520 + I]
+    
+    TSTE Z C            ; Vergelijk C met 0
+    JMPT ENCRYPT_DONE   ; Als nul, stop de encryptie-lus
+    
+    ; Lanceer de thread. De uCore krijgt de waarde van Register C mee!
+    CONTEXT C THREAD_ENCRYPT_WORKER 
+
+    ; De Master-CPU wacht hier op de hardware-interlock tot deze specifieke uCore klaar is.
+    ; Zodra de worker 'CLOSE' aanroept, landt de versleutelde byte weer in ons Register C.
+WAIT_FOR_ENC_CORE:
+    JOIN C WAIT_FOR_ENC_CORE 
+
+    ; Sla het geoogste resultaat op de juiste indexpositie op
+    STX C 532           ; Geheugen[532 + I] = Versleutelde byte
+    
+    INC I               ; Volgende karakter
+    JMP ENCRYPT_LOOP    
+
+ENCRYPT_DONE:
+
+
+
+    ; ==========================================================
+    ;  FASE 3: DECRYPTIE LUS (EXACT DEZELFDE PARALLELLE LOGICA)
+    ; ==========================================================
+    LDI I 0             ; Reset index I naar 0
+
+DECRYPT_LOOP:
+    LDX C 532           ; C = Versleutelde data uit Geheugen[532 + I]
+    
+    TSTE Z C            ; Vergelijk C met 0 (einde encrypted string)
+    JMPT DECRYPT_DONE   ; Als nul, stop de decryptie-lus
+    
+    ; Lanceer de decryptie worker en geef de encrypted byte mee via C
+    CONTEXT C THREAD_DECRYPT_WORKER 
+
+    ; Wacht tot de uCore de SM32_RND en XOR heeft afgerond
+WAIT_FOR_DEC_CORE:
+    JOIN C WAIT_FOR_DEC_CORE 
+
+    ; Schrijf de herstelde byte weg via de gecontroleerde Master-index
+    STX C 544           ; De gedecodeerde string komt op Geheugen[544 + I]       
+                
+    INC I               
+    JMP DECRYPT_LOOP    
+
+DECRYPT_DONE:
+    HALT                ; Het programma is succesvol doorlopen!
+
+
+; ==============================================================================
+;  HARDWARE WORKER THREAD CODE BLOKKEN (Draaien autonoom op de uCores matrix)
+; ==============================================================================
+
+THREAD_ENCRYPT_WORKER:
+    ; Bij de start bevat ons lokale Register A (R1) de waarde van de byte
+    ; die de Master CPU via de CONTEXT-instructie heeft meegegeven.
+
+    LDM K 515           ; Haal de pre-shared basis-sleutel op uit het geheugen
+    SM32_RND K 7        ; Voer de zware cryptografische transformatie uit
+
+    XOR C K             ; Versleutel de byte: A = A XOR K
+
+    ; We geven de waarde in Register A terug aan de Master via de CLOSE/JOIN hardware.
+    CLOSE               ; Lever de uCore terug aan de matrix-pool!
+
+
+THREAD_DECRYPT_WORKER:
+    ; Identiek aan de encryptie-worker, maar herstelt de data
+    LDM K 515           
+    SM32_RND K 7        
+
+    XOR C K             ; XOR met dezelfde K heft de encryptie weer op
+
+    CLOSE               ; Geef de core vrij en retourneer de waarde in A
 """

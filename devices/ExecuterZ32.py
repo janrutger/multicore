@@ -332,332 +332,117 @@ def _execute_cycleZ32(master_cpu, target):
                 target.PC = arg2
             target.fsm_state = 'FETCH'
 
+        elif opcode == Op.CONTEXT:
+            # Alleen de hoofd-CPU (master) mag threads (contexts) spawnen
+            if target != master_cpu:
+                raise RuntimeError("Hardware Fault: Een sub-context probeerde zelf een CONTEXT te spawnen!")
+                
+            # 1. Probeer de nieuwe hardware context aan te maken
+            nieuwe_ctx = HardwareContext(master_cpu, reg1)
+            
+            # 2. Check of de allocatie is geslaagd via de hardware-statusvlag
+            if master_cpu.status == 0:
+                # Geen uCores vrij! Dwing een stall op de CONTEXT-instructie van de master-CPU
+                target.fsm_state = 'EXECUTE'
+                return
+                
+            # 3. Allocatie succesvol (status == 1)! Configureer de startparameters van de thread
+            nieuwe_ctx.PC = arg2            # Dit wordt het startadres (bijv. 11)
+            nieuwe_ctx.fsm_state = 'FETCH'  # Activeer de thread direct voor de scheduler
+            
+            # 4. Voeg hem toe aan de actieve contexts lijst
+            master_cpu.contexts.append(nieuwe_ctx)
+
+        elif opcode == Op.CLOSE:
+            if target == master_cpu:
+                raise RuntimeError("Hardware Fault: De master-CPU mag CLOSE niet aanroepen!")
+            
+            # We lopen door de registers van de thread
+            for reg_val in target.registers.values():
+                if reg_val is not None:  # Dit is een Core-ID wijzer naar ons (eind)resultaat
+                    assigned_core = master_cpu.cores[reg_val]
+                    
+                    # Een core is pas bruikbaar voor de Master als de dataflow-keten 
+                    # volledig is afgerond en de core de status 'VALID' heeft bereikt.
+                    # Als hij nog 'WORKING' is, óf nog moet beginnen ('IDLE' maar onderdeel van een keten),
+                    # moeten we de thread laten stallen.
+                    if assigned_core.coreStatus != 'VALID':
+                        # De keten is nog niet klaar! Dwing de thread om te wachten.
+                        target.fsm_state = 'EXECUTE'
+                        return 
+
+            # Pas als álle cores in de registers van de thread de status 'VALID' hebben,
+            # is de berekening gegarandeerd voltooid en kan de Master veilig JOINEN.
+            target.fsm_state = 'DONE'
+            return
+
+            # # --- DE ONTSNAPPING ---
+            # # Als we hier komen, zijn álle cores die aan deze thread gekoppeld waren gegarandeerd klaar!
+            # target.fsm_state = 'DONE'
+            # return  # Stop direct met executeren voor deze thread, keer nooit meer terug naar FETCH!
+
+        elif opcode == Op.JOIN:
+            if target != master_cpu:
+                raise RuntimeError("Hardware Fault: Een sub-context kan geen JOIN uitvoeren!")
+                
+            if not master_cpu.contexts:
+                master_cpu.status = 0
+                target.PC = arg2
+                target.fsm_state = 'FETCH'
+                return
+            
+            # Inspecteer de oudste actieve thread
+            oudste_thread = master_cpu.contexts[0]
+            
+            if oudste_thread.fsm_state not in ['DONE', 'HALT', 'CLOSE']:
+                master_cpu.status = 0       
+                target.PC = arg2            
+                target.fsm_state = 'FETCH'  
+                return                      
+                
+            # Oogst de uCore-pointer uit de thread op de exacte register-index (reg1)
+            thread_result_core = oudste_thread.registers[reg1]
+
+            # HARDWARE CRITICAL: Het resultaat-register MAG NOOIT leeg (None) zijn bij een JOIN!
+            if thread_result_core is None:
+                raise RuntimeError(
+                    f"Hardware Fault: Fatale dataflow-breuk! Thread resulterend register {reg1} "
+                    f"bevat geen geldige uCore-pointer tijdens JOIN."
+                )
+
+            # if thread_result_core is not None:
+                # VEILIGE HARDWARE CHECK: Is de resultaat-core al ECHT klaar?
+            if master_cpu.cores[thread_result_core].coreStatus == 'WORKING':
+                # De thread is DONE, maar de ALU-microcode tikt nog.
+                # In plaats van de FSM te bevriezen in 'EXECUTE', springen we terug
+                # naar het polling-adres zodat de simulator/uCores blijven tikken!
+                master_cpu.status = 0
+                target.PC = arg2            # Spring terug naar WAIT_FOR_THREAD
+                target.fsm_state = 'FETCH'  # Geef de rest van de matrix ademruimte
+                return
+            
+                # elif master_cpu.cores[thread_result_core].coreStatus == 'VALID':
+                    # Draag de uCore-pointer direct over naar de CPU registers van de master
+            master_cpu.registers[reg1] = thread_result_core
+            master_cpu.last_active_core = thread_result_core
+                
+            # SCHOONMAAKWERK: Zet alle overige uCores van deze thread-context op IDLE
+            for reg_idx, core_id in oudste_thread.registers.items():
+                if core_id is not None:
+                    if core_id == thread_result_core:
+                        continue
+                    master_cpu.cores[core_id].coreStatus = 'IDLE'
+            
+            # Ruim de context op uit de actieve lijst
+            master_cpu.contexts.pop(0)
+            master_cpu.status = 1           
+            target.fsm_state = 'FETCH'
+
+        
+
+
         # Zorg dat de standaardafhandeling de eigen FSM reset
         target.fsm_state = 'FETCH'
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# def _execute_cycleZ32(self):
-#         """De CPU State Machine: 1 deeltaak per tick."""
-        
-#         if self.fsm_state == 'FETCH':
-#             self.MIR = self.memory.memRead(self.PC)
-#             self.PC += 1
-#             self.fsm_state = 'DECODE'
-
-#         elif self.fsm_state == 'DECODE':
-#             if self.MIR == 0:               
-#                 self.fsm_state = 'FETCH'
-#                 return
-                
-#             try:
-#                 opcode = Op(self.MIR % 100)
-#             except ValueError:
-#                 print(f"Hardware error: Unknown opcode {self.MIR % 100}")
-#                 self.fsm_state = 'FETCH'
-#                 return
-
-#             self.decoded_opcode = opcode
-#             payload = self.MIR // 100
-
-#             if opcode in FORMAT_ZERO:  
-#                 self.decoded_reg1 = 0
-#                 self.decoded_arg2 = 0
-#             elif opcode in FORMAT_ONE_ADDR:  
-#                 self.decoded_reg1 = 0
-#                 self.decoded_arg2 = payload       
-#             elif opcode in FORMAT_TWO_REG_REG:
-#                 self.decoded_reg1 = payload % 10  
-#                 self.decoded_arg2 = payload // 10 
-#             elif opcode in FORMAT_TWO_REG_VAL:
-#                 self.decoded_reg1 = payload % 10  # Register
-#                 self.decoded_arg2 = payload // 10 # Directe waarde of RAM-adres
-#             elif opcode in FORMAT_ONE_REG:
-#                 self.decoded_reg1 = payload % 10
-#                 self.decoded_arg2 = 0
-#             else:
-#                 self.decoded_reg1 = payload % 10  
-#                 self.decoded_arg2 = payload // 10 
-
-#             self.fsm_state = 'EXECUTE'
-
-#         elif self.fsm_state == 'EXECUTE':
-#             opcode = self.decoded_opcode
-#             reg1   = self.decoded_reg1
-#             arg2   = self.decoded_arg2
-
-#             # ==========================================
-#             #   CORE INSTRUCTIES (Vereisen een vrije core)
-#             # ==========================================
-#             if opcode == Op.LDI:
-#                 if not self.free_cores: return # Stall
-#                 core_id = self.free_cores.popleft()
-                
-#                 self.cores[core_id].transfer = arg2
-#                 self.cores[core_id].dispatch('ldv')
-#                 self.registers[reg1] = core_id
-#                 self.last_active_core = core_id
-
-#             elif opcode == Op.LDM:
-#                 if not self.free_cores: return # Stall
-#                 core_id = self.free_cores.popleft()
-                
-#                 # FIX: Haal de waarde écht uit het RAM-geheugen (arg2 = 20)
-#                 mem_value = self.memory.memRead(arg2)
-                
-#                 self.cores[core_id].transfer = mem_value
-#                 self.cores[core_id].dispatch('ldv') # Laad de waarde in de core
-#                 self.registers[reg1] = core_id
-#                 self.last_active_core = core_id
-
-#             elif opcode == Op.LDX:
-                
-#                 # LDX Rx mem_base -> Laad in Rx de waarde vanaf RAM-adres (mem_base + R0)
-#                 # R0 (index 0) is ons vaste index-register 'I'
-#                 index_core = self.registers[0]  # Haal de core op die gekoppeld is aan R0 (I)
-                
-#                 if index_core is not None and self.cores[index_core].coreStatus == 'VALID':
-#                     if not self.free_cores: return          #  Fast Stall when there is no free ucore
-#                     core_id = self.free_cores.popleft()     #  Get the ucore 
-
-#                     # Bereken het effectieve adres: mem_base (arg2) + de waarde van I
-#                     effective_addr = arg2 + self.cores[index_core].value
-#                     ram_value = self.memory.memRead(effective_addr)
-                    
-#                     self.cores[core_id].transfer = ram_value
-#                     self.cores[core_id].dispatch('ldv') # Laad de waarde in de core
-#                     self.registers[reg1] = core_id
-#                     self.last_active_core = core_id
-#                 else:
-#                     return  # Stall de CPU als de waarde in index-register I nog niet VALID is
-        
-
-#             elif opcode == Op.ADD:
-#                 if not self.free_cores: return # Stall
-#                 core_id = self.free_cores.popleft()
-                
-#                 src1_core = self.registers[reg1]
-#                 src2_core = self.registers[arg2] 
-                
-#                 self.cores[core_id].dispatch('add', arg1=src1_core, arg2=src2_core)
-#                 self.registers[reg1] = core_id
-#                 self.last_active_core = core_id         
-                
-#             elif opcode == Op.MUL:
-#                 if not self.free_cores: return # Stall
-#                 core_id = self.free_cores.popleft()
-                
-#                 src1_core = self.registers[reg1]
-#                 src2_core = self.registers[arg2] 
-                
-#                 self.cores[core_id].dispatch('slow_mul', arg1=src1_core, arg2=src2_core)
-#                 self.registers[reg1] = core_id
-#                 self.last_active_core = core_id
-
-#             elif opcode == Op.INC:
-#                 if not self.free_cores: return # stall
-#                 core_id = self.free_cores.popleft()
-
-#                 src1_core = self.registers[reg1]
-
-#                 self.cores[core_id].dispatch('inc', arg1=src1_core, arg2=None)
-#                 self.registers[reg1] = core_id
-#                 self.last_active_core = core_id
-
-#             elif opcode == Op.DEC:
-#                 if not self.free_cores: return # stall
-#                 core_id = self.free_cores.popleft()
-
-#                 src1_core = self.registers[reg1]
-
-#                 self.cores[core_id].dispatch('dec', arg1=src1_core, arg2=None)
-#                 self.registers[reg1] = core_id
-#                 self.last_active_core = core_id
-
-#             elif opcode == Op.MOD:
-#                 if not self.free_cores: return # Stall
-#                 core_id = self.free_cores.popleft()
-                
-#                 src1_core = self.registers[reg1]
-#                 src2_core = self.registers[arg2] 
-                
-#                 self.cores[core_id].dispatch('mod', arg1=src1_core, arg2=src2_core)
-#                 self.registers[reg1] = core_id
-#                 self.last_active_core = core_id
-
-#             elif opcode == Op.XOR:
-#                 if not self.free_cores: return # Stall
-#                 core_id = self.free_cores.popleft()
-                
-#                 src1_core = self.registers[reg1]
-#                 src2_core = self.registers[arg2] 
-                
-#                 self.cores[core_id].dispatch('xor_vw', arg1=src1_core, arg2=src2_core)
-#                 self.registers[reg1] = core_id
-#                 self.last_active_core = core_id
-
-#             elif opcode == Op.SHIFTL:
-#                 if not self.free_cores: return # Stall
-#                 core_id = self.free_cores.popleft()
-
-#                 src1_core = self.registers[reg1]
-#                 self.cores[core_id].transfer = arg2
-
-#                 self.cores[core_id].dispatch('shftl', arg1=src1_core, arg2=None)
-#                 self.registers[reg1] = core_id
-#                 self.last_active_core = core_id
-
-#             elif opcode == Op.SM32_RND:
-#                 if not self.free_cores: return # Stall
-#                 core_id = self.free_cores.popleft()
-
-#                 src1_core = self.registers[reg1]
-#                 self.cores[core_id].transfer = arg2
-
-#                 self.cores[core_id].dispatch('sm32_rnd', arg1=src1_core, arg2=None)
-#                 self.registers[reg1] = core_id
-#                 self.last_active_core = core_id
-
-            
-
-#             elif opcode == Op.ROTL32:
-#                 if not self.free_cores: return # Stall
-#                 core_id = self.free_cores.popleft()
-
-#                 src1_core = self.registers[reg1]
-#                 self.cores[core_id].transfer = arg2
-
-#                 # Start de 'rol32' microcode keten
-#                 self.cores[core_id].dispatch('rol32', arg1=src1_core, arg2=None)
-#                 self.registers[reg1] = core_id
-#                 self.last_active_core = core_id
-
-#             elif opcode == Op.TSTE:
-#                 # Test op Gelijkheid (bijv: tste A B)
-#                 if not self.free_cores: return # Stall
-#                 core_id = self.free_cores.popleft()
-                
-#                 src1_core = self.registers[reg1]
-#                 src2_core = self.registers[arg2]
-                
-#                 # Start de core met de microcode 'cmpe' uit ucore.py
-#                 self.cores[core_id].dispatch('cmpe', arg1=src1_core, arg2=src2_core)
-
-                
-#                 # Update de registers én registreer dit als de laatste test-core!
-#                 self.registers[reg1] = core_id
-#                 self.last_active_core = core_id
-#                 self.last_test_core = core_id  # <--- HIER leggen we de 'booleaanse waarheid' vast!
-
-
-#             # ==========================================
-#             #   SYSTEM / FLOW CONTROL
-#             # ==========================================
-#             elif opcode == Op.HALT:
-#                 # We zetten een vlaggetje of stoppen de CPU-state machine
-#                 # Zodat main.py weet dat we klaar zijn.
-#                 self.fsm_state = 'HALT'
-#                 return
-            
-#             elif opcode == Op.STO:
-#                 # STO reg1 arg2 -> Sla de waarde van reg1 op in memory[arg2]
-#                 core_id = self.registers[reg1]
-                
-#                 # HARDWARE CHECK: Als het register nog None is (nooit toegewezen), gooien we een crash
-#                 if core_id is None:
-#                     raise RuntimeError(
-#                         f"Hardware Fault: STO aangeroepen op PC={self.PC-1} "
-#                         f"(MIR={self.MIR}) waarbij Register {reg1} wordt aangesproken, "
-#                         f"maar dit register heeft nog geen actieve Core-ID toegewezen gekregen!"
-#                     )
-                
-#                 # 1. HARDWARE STALL: Wacht tot de betreffende core klaar is met rekenen!
-#                 if self.cores[core_id].coreStatus != 'VALID':
-#                     return # Blijf in EXECUTE-state (stall) tot de core-data stabiel is.
-                
-#                 # 2. Haal de waarde rechtstreeks uit de stabiele core
-#                 value_to_store = self.cores[core_id].value
-                
-#                 # 3. Schrijf de waarde direct weg naar het RAM-geheugen
-#                 self.memory.memWrite(value_to_store, adres=arg2)
-
-#             elif opcode == Op.STX:
-#                 # STX Rx mem_base -> Sla de waarde van Rx op op RAM-adres (mem_base + R0)
-#                 index_core = self.registers[0]         # R0 is ons index-register I
-#                 data_core = self.registers[reg1]       # De core gekoppeld aan Rx die we willen opslaan
-                
-#                 # We kunnen pas schrijven als BEIDE cores VALID zijn!
-#                 if (index_core is not None and self.cores[index_core].coreStatus == 'VALID' and
-#                     data_core is not None and self.cores[data_core].coreStatus == 'VALID'):
-                    
-#                     # Bereken het effectieve adres: mem_base (arg2) + de waarde van I
-#                     effective_addr = arg2 + self.cores[index_core].value
-#                     val_to_store = self.cores[data_core].value
-                    
-#                     # Schrijf het direct weg naar het RAM-geheugen
-#                     # self.memory.memWrite(effective_addr, val_to_store)
-#                     self.memory.memWrite(val_to_store, adres=effective_addr)
-#                 else:
-#                     return  # Stall de CPU als I of Rx nog niet klaar is met rekenen
-
-#             elif opcode == Op.JMP:
-#                 self.PC = arg2
-
-        
-#             elif opcode == Op.JMPT:
-#                 if self.last_test_core is None:
-#                     raise RuntimeError("Hardware Fault: JMPT zonder voorafgaande TSTE!")
-                
-#                 test_core = self.cores[self.last_test_core]
-                
-#                 # STAP 1: De Stall-barrière
-#                 # Is de ucore nog bezig? Dwing de EXECUTE-state en stop de tick (Stall)
-#                 if test_core.coreStatus == 'WORKING':
-#                     self.fsm_state = 'EXECUTE'
-#                     return
-                
-#                 # STAP 2: De Ontsnapping / Uitvoering
-#                 # Als we hier komen is de core gegarandeerd VALID!
-#                 if test_core.status == True:
-#                     self.PC = arg2
-                
-#                 # De instructie is afgehandeld, we mogen weer fetchen
-#                 self.fsm_state = 'FETCH'
-
-
-#             elif opcode == Op.JMPF:
-#                 if self.last_test_core is None:
-#                     raise RuntimeError("Hardware Fault: JMPF zonder voorafgaande TSTE!")
-                
-#                 test_core = self.cores[self.last_test_core]
-                
-#                 # STAP 1: De Stall-barrière
-#                 # Is de ucore nog bezig? Dwing de EXECUTE-state en stop de tick (Stall)
-#                 if test_core.coreStatus == 'WORKING':
-#                     self.fsm_state = 'EXECUTE'
-#                     return
-                
-#                 # STAP 2: De Ontsnapping / Uitvoering
-#                 # Als we hier komen is de core gegarandeerd VALID!
-#                 if test_core.status == False:
-#                     self.PC = arg2
-                
-#                 # De instructie is afgehandeld, we mogen weer fetchen
-#                 self.fsm_state = 'FETCH'
-
-#             self.fsm_state = 'FETCH'
 
 
 

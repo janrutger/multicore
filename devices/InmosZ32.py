@@ -34,6 +34,7 @@ class CPU:
         self.status = 1                        # Status flag is true
 
         self.contexts = []                     # <-- De order-safe lijst voor actieve threads
+        self.current_context_index = 0         # <-- Start de round-robin pointer op index 0
 
         self.fsm_state = 'FETCH'             # FETCH, DECODE, EXECUTE
         self.MIR       = None                # Memory Instruction Register (onze huidige integer)
@@ -62,12 +63,22 @@ class CPU:
                 if core.coreStatus == 'IDLE' and core_id not in self.free_cores:
                     self.free_cores.append(core_id)
 
-                # --- STAP B: CONTROLEER OP WEZEN (GARBAGE COLLECTION) ---
+
+                # --- STAP B: CONTROLEER OP WEZEN (DRAAD-VEILIGE GARBAGE COLLECTION) ---
                 if core.coreStatus == 'VALID':
-                    in_register = any(reg_id == core_id for reg_id in self.registers.values())
+                    # 1. Check Master CPU registers
+                    in_master_register = any(reg_id == core_id for reg_id in self.registers.values())
+                    
+                    # 2. Check ALLE threads die nog in het systeem zitten (ongeacht FSM status!)
+                    in_thread_register = False
+                    for ctx in self.contexts:
+                        if any(reg_id == core_id for reg_id in ctx.registers.values()):
+                            in_thread_register = True
+                            break
+                            
                     is_test_core = (self.last_test_core == core_id)
                     
-                    # Check of er een WORKING core is die deze core_id als arg1 of arg2 heeft
+                    # 3. Check of er een WORKING core is die deze core nodig heeft
                     wordt_nog_bezocht = False
                     for andere_core in self.cores:
                         if andere_core.coreStatus == 'WORKING':
@@ -75,10 +86,9 @@ class CPU:
                                 wordt_nog_bezocht = True
                                 break
                     
-                    # Alleen opruimen als hij écht nergens meer aan gekoppeld is
-                    if not in_register and not is_test_core and not wordt_nog_bezocht:
+                    # Alleen slopen als hij écht door helemaal niemand meer geclaimd wordt
+                    if not in_master_register and not in_thread_register and not is_test_core and not wordt_nog_bezocht:
                         core.coreStatus = 'IDLE'
-
 
             # 2. CONTEXT SCHEDULER: Tik exact ÉÉN actieve context aan die RUNNING is
             active_running_contexts = [c for c in self.contexts if c.fsm_state in ('FETCH', 'DECODE', 'EXECUTE', 'RUNNING')]
@@ -97,6 +107,8 @@ class CPU:
                 # Schuif de pointer door naar de volgende context EN pas direct modulo toe 
                 # zodat de waarde direct klopt en opgeslagen wordt voor de volgende tick.
                 self.current_context_index = (self.current_context_index + 1) % len(active_running_contexts)
+
+
 
             # 3. Voer DAARNA de huidige hoofd-CPU instructie uit
             self._execute_cycle(self, self)

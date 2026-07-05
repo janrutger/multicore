@@ -1,6 +1,6 @@
 # main.py
 from InmosZ32 import CPU
-from opcodes import Op, Reg, assembly_program, encrypt_program, context_test
+from opcodes import Op, Reg, assembly_program, encrypt_program, context_test, context_test1
 from assembler import assemble
 from frontpanel import FrontPanel
 
@@ -16,7 +16,7 @@ def run_test():
 
     # De assembler doet nu al het rekenwerk voor je!
     # test_program = assemble(encrypt_program)        # the source can be found in opcodes.py
-    test_program = assemble(context_test)  
+    test_program = assemble(context_test1)  
     
     # Print even ter controle de gegenereerde machinecode integers
     print(f"Gegenereerde machinecode: {test_program}\n")
@@ -37,9 +37,22 @@ def run_test():
         cpu.tick()
 
         # Print de status van deze specifieke tick
-        print(f"Tick {tick_count:02d} | CPU State: {current_state:<7} | PC: {current_pc} | MIR: {cpu.MIR}")
+        # print(f"Tick {tick_count:02d} | CPU State: {current_state:<7} | PC: {current_pc} | MIR: {cpu.MIR}")
+        # --- DE NIEUWE PARALLELLE LOGGING ---
+        # 1. Bouw de status-regel voor de Master-CPU
+        master_log = f"Tick {tick_count:02d} | MASTER -> State: {cpu.fsm_state:<7} | PC: {cpu.PC:<2} | MIR: {cpu.MIR if cpu.MIR is not None else 'None':<12}"
+        
+        # 2. Bouw de status-regel voor eventuele actieve sub-threads (contexts)
+        context_logs = []
+        for idx, ctx in enumerate(cpu.contexts):
+            context_logs.append(f"   [Thread {idx}] State: {ctx.fsm_state:<7} | PC: {ctx.PC:<2} | MIR: {ctx.MIR if ctx.MIR is not None else 'None':<12}")
+        
+        # 3. Print alles netjes onder elkaar
+        print(master_log)
+        for c_log in context_logs:
+            print(c_log)
 
-        # NIEUW: Update het frontpaneel in realtime tijdens de simulatie-lus
+        # Update het frontpaneel in realtime tijdens de simulatie-lus
         if SHOW_GUI and panel:
             panel.update_cores(cpu.cores)
 
