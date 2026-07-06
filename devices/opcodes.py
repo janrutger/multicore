@@ -10,7 +10,7 @@ class Op(IntEnum):
     DI    = 14
     RTI   = 15
 
-    CLOSE = 29
+    CLOSE = 29      # Implemented
 
     # --- FORMAT: ONE_ADDR ---
     JMPF  = 20      # Implemented
@@ -19,6 +19,9 @@ class Op(IntEnum):
     CALL  = 24
     CALLX = 25
     INT   = 26
+
+    SUCCES = 16
+    FAIL   = 17
 
     # --- FORMAT: TWO_REG_VAL / TWO_REG_ADDR --- 
     LDI   = 31      # Implemented
@@ -35,15 +38,15 @@ class Op(IntEnum):
     STACK = 92
     USTACK= 93
 
-    CONTEXT = 27
-    JOIN    = 28
+    CONTEXT = 27      # Implemented
+    JOIN    = 28      # Implemented
 
     SHIFTL   = 43      # Implemented
     ROTL32   = 44      # Implemented
     SM32_RND = 45      # Implemented
 
     # --- FORMAT: TWO_REG_REG ---
-    LD    = 30 
+    LD    = 30      # Implemented 
     ADD   = 50      # Implemented 
     SUB   = 52
     MUL   = 60      # Implemented
@@ -64,7 +67,7 @@ class Op(IntEnum):
 
 # Vaste sets voor de decoder om snel het format te matchen
 FORMAT_ZERO        = {Op.HALT, Op.RET, Op.EI, Op.DI, Op.RTI, Op.CLOSE}
-FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.CALL, Op.CALLX, Op.INT}
+FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.CALL, Op.CALLX, Op.INT, Op.SUCCES, Op.FAIL}
 FORMAT_ONE_REG     = {Op.PUSH, Op.POP, Op.GPU, Op.CALLS, Op.INC, Op.DEC}
 FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.TSTE, Op.TSTG, Op.XOR}
 FORMAT_TWO_REG_VAL = {Op.LDI, Op.LDM, Op.LDX, Op.STO, Op.STX, Op.SHIFTL, Op.ROTL32, Op.SM32_RND, Op.CONTEXT, Op.JOIN, Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI}
@@ -90,6 +93,7 @@ class Reg(IntEnum):
 # ucode instructions are called by de CPU intructionn(dispatch)
 MICROCODE_ROM = {
     'ldv':    ['mv_tv',  'setResult'],
+    'ld':     ['valid_v', 'valid_w', 'mv_wv', 'setResult'],
     'stv':    ['mv_vt',  'setResult'],
     'status': ['status', 'setResult'],
 
@@ -482,6 +486,8 @@ context_test1 = """
     MUL X Y             ; X = 5 * 5 = 25
     STO X 500           ; Sla resultaat van hoofd-CPU op op adres 500
 
+    
+
     ; ==========================================================
     ;  HARDWARE SYNCHRONISATIE BARRIÈRE (The OCCAM Join)
     ; ==========================================================
@@ -496,6 +502,9 @@ WAIT_T2:
 WAIT_T3:
     JOIN C WAIT_T3      ; Wacht op Thread 3. Indien klaar: oogst resultaat in C.
     STO C 514           ; Sla resultaat Thread 3 op op adres 514
+
+    LDI Z 0
+    LD Z C
 
     HALT                ; Volledige systeemstop!
 
@@ -519,8 +528,97 @@ THREAD_3:
 """
 
 
+context_test1a = """
+; ==========================================================
+;  HOOFD-CPU: MULTI-CONTEXT STRESS TEST
+; ==========================================================
+    ; Stap 1: Bereid de invoerwaarden voor in registers
+    LDI A 10            ; Thread 1 invoer = 10
+    LDI B 20            ; Thread 2 invoer = 20
+    LDI C 30            ; Thread 3 invoer = 30
+
+    ; Terwijl er nu 3 uCores tegelijk vechten om de round-robin ticks,
+    ; doet de hoofd-CPU zelf ook nog een flinke achtergrondklus:
+    LDI X 5
+    LDI Y 5
+    MUL X Y             ; X = 5 * 5 = 25
+    
+    ; ==========================================================
+    ;  HARDWARE SYNCHRONISATIE BARRIÈRE (The OCCAM Join)
+    ; ==========================================================
+
+    LDI X 5
+    MUL A X             ; A = 10 * 5 = 50 (Zware uCore MUL!)
+    
+
+    LDI X 10
+    MUL B X             ; B = 20 * 10 = 200 (Zware uCore MUL!)
+    
+WAIT_T3:
+    LDI X 100
+    ADD C X             ; C = 30 + 100 = 130 (Snelle uCore ADD)
+
+    STO X 500           ; Sla resultaat van hoofd-CPU op op adres 500
+    STO A 512           ; Sla resultaat Thread 1 op op adres 512
+    STO B 513           ; Sla resultaat Thread 2 op op adres 513
+    STO C 514           ; Sla resultaat Thread 3 op op adres 514
+    
+
+    HALT                ; Volledige systeemstop!
+
+;
+"""
 
 
+context_stress = """
+; ==========================================================
+;  15x CONTEXT STRESSTEST (Gecorrigeerd)
+; ==========================================================
+    LDI A 5             ; Bronwaarde voor de threads (blijft ALTIJD 1)
+    LDI I 0             ; Lus-teller I = 0
+    LDI Y 100            ; De doelwaarde (15 iteraties)
+    LDI X 0             ; Totaalteller X = 0
+    
+SPAWN_LOOP:
+    TSTE I Y            
+    JMPT FLUSH_REMAINING 
+
+    CONTEXT A THREAD_WORKER 
+    FAIL MATRIX_FULL_HANDLER  
+
+    INC I               
+    JMP SPAWN_LOOP      
+
+MATRIX_FULL_HANDLER:
+    ; Oogst in register B in plaats van A! Hierdoor blijft Master-register A intact.
+    JOIN B MATRIX_FULL_HANDLER 
+    
+    ADD X B             ; Tel het resultaat uit B op bij het totaal X
+
+    JMP SPAWN_LOOP
+
+; ==========================================================
+;  FINALE FLUSH
+; ==========================================================
+FLUSH_REMAINING:
+    ; Oogst ook hier in register B!
+    JOIN B ALL_DONE     
+
+    ADD X B
+    JMP FLUSH_REMAINING
+
+ALL_DONE:
+    STO X 512           ; Sla het eindresultaat op op adres 512
+    HALT                
+
+; ==========================================================
+;  PARALLELLE WORKER THREAD CODE
+; ==========================================================
+THREAD_WORKER:
+    LDI B 1             
+    MUL B A            
+    CLOSE
+"""
 
 
 

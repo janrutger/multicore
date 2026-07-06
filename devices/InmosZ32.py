@@ -6,7 +6,7 @@ from memory import Memory
 from ucore  import Ucore
 
 from ExecuterZ32 import _execute_cycleZ32 
-from ExecuterZ32 import HardwareContext
+# from ExecuterZ32 import HardwareContext
 
 # Importeer de STERN-boekhouding uit het andere bestand
 from opcodes import Op, FORMAT_ZERO, FORMAT_ONE_ADDR, FORMAT_ONE_REG, FORMAT_TWO_REG_REG, FORMAT_TWO_REG_VAL

@@ -25,7 +25,7 @@ class HardwareContext:
             # Als er geen cores vrij zijn, zetten we de cpu_status op 0 (Fail)
             master_cpu.status = 0
             # We gooien een specifieke status zodat de CONTEXT-instructie weet dat hij moet stallen/afbreken
-            raise RuntimeError("Hardware Stall: Geen vrije ucores beschikbaar in de pool!")
+            # raise RuntimeError("Hardware Stall: Geen vrije ucores beschikbaar in de pool!")
         
         else:
             # Succes! Pop de core direct uit de pool van de hoofd-CPU
@@ -125,6 +125,17 @@ def _execute_cycleZ32(master_cpu, target):
             
             master_cpu.cores[core_id].transfer = arg2
             master_cpu.cores[core_id].dispatch('ldv')
+            target.registers[reg1] = core_id
+            target.last_active_core = core_id
+
+        elif opcode == Op.LD:
+            if not master_cpu.free_cores: return # Stall
+            core_id = master_cpu.free_cores.popleft()
+            
+            src1_core = target.registers[reg1]
+            src2_core = target.registers[arg2] 
+        
+            master_cpu.cores[core_id].dispatch('ld', arg1=src1_core, arg2=src2_core) 
             target.registers[reg1] = core_id
             target.last_active_core = core_id
 
@@ -332,26 +343,63 @@ def _execute_cycleZ32(master_cpu, target):
                 target.PC = arg2
             target.fsm_state = 'FETCH'
 
+        elif opcode == Op.SUCCES:
+            if master_cpu.status == 1:
+                master_cpu.PC = arg2
+            master_cpu.fsm_state = 'FETCH'
+
+        elif opcode == Op.FAIL:
+            if master_cpu.status == 0:
+                master_cpu.PC = arg2
+                master_cpu.status = 1
+            master_cpu.fsm_state = 'FETCH'
+
+
+        # elif opcode == Op.CONTEXT:
+        #     # Alleen de hoofd-CPU (master) mag threads (contexts) spawnen
+        #     if target != master_cpu:
+        #         raise RuntimeError("Hardware Fault: Een sub-context probeerde zelf een CONTEXT te spawnen!")
+                
+        #     # 1. Probeer de nieuwe hardware context aan te maken
+        #     nieuwe_ctx = HardwareContext(master_cpu, reg1)
+            
+        #     # 2. Check of de allocatie is geslaagd via de hardware-statusvlag
+        #     if master_cpu.status == 0:
+        #         # Geen uCores vrij! Dwing een stall op de CONTEXT-instructie van de master-CPU
+        #         # target.fsm_state = 'EXECUTE'
+        #         # return
+        #         master_cpu.status = 0          # Signaleer FAIL naar de CPU
+        #         target.fsm_state = 'FETCH'     # NIET STALLEN! Ga door naar de volgende instructie (bijv. Op.FAIL)
+        #         return                         # Breek de CONTEXT-allocatie vreedzaam af
+                
+        #     # 3. Allocatie succesvol (status == 1)! Configureer de startparameters van de thread
+        #     nieuwe_ctx.PC = arg2            # Dit wordt het startadres (bijv. 11)
+        #     nieuwe_ctx.fsm_state = 'FETCH'  # Activeer de thread direct voor de scheduler
+            
+        #     # 4. Voeg hem toe aan de actieve contexts lijst
+        #     master_cpu.contexts.append(nieuwe_ctx)
         elif opcode == Op.CONTEXT:
             # Alleen de hoofd-CPU (master) mag threads (contexts) spawnen
             if target != master_cpu:
                 raise RuntimeError("Hardware Fault: Een sub-context probeerde zelf een CONTEXT te spawnen!")
                 
-            # 1. Probeer de nieuwe hardware context aan te maken
-            nieuwe_ctx = HardwareContext(master_cpu, reg1)
+            # 1. HARDWARE HIGH-WATERMARK CHECK: 
+            # We hebben minimaal een buffer van 3 vrije cores nodig om deadlocks te voorkomen!
+            if len(master_cpu.free_cores) < 3:
+                master_cpu.status = 0          # Signaleer FAIL naar de CPU status
+                target.fsm_state = 'FETCH'     # NIET STALLEN! Ga direct naar de volgende instructie (FAIL)
+                return                         # Breek de CONTEXT-allocatie veilig af
             
-            # 2. Check of de allocatie is geslaagd via de hardware-statusvlag
-            if master_cpu.status == 0:
-                # Geen uCores vrij! Dwing een stall op de CONTEXT-instructie van de master-CPU
-                target.fsm_state = 'EXECUTE'
-                return
+            # 2. Allocatie is gegarandeerd succesvol! Maak nu pas de hardware context aan
+            nieuwe_ctx = HardwareContext(master_cpu, reg1)
                 
-            # 3. Allocatie succesvol (status == 1)! Configureer de startparameters van de thread
+            # 3. Configureer de startparameters van de thread
             nieuwe_ctx.PC = arg2            # Dit wordt het startadres (bijv. 11)
             nieuwe_ctx.fsm_state = 'FETCH'  # Activeer de thread direct voor de scheduler
             
             # 4. Voeg hem toe aan de actieve contexts lijst
             master_cpu.contexts.append(nieuwe_ctx)
+            target.fsm_state = 'FETCH'
 
         elif opcode == Op.CLOSE:
             if target == master_cpu:
@@ -366,7 +414,7 @@ def _execute_cycleZ32(master_cpu, target):
                     # volledig is afgerond en de core de status 'VALID' heeft bereikt.
                     # Als hij nog 'WORKING' is, óf nog moet beginnen ('IDLE' maar onderdeel van een keten),
                     # moeten we de thread laten stallen.
-                    if assigned_core.coreStatus != 'VALID':
+                    if assigned_core.coreStatus == 'WORKING':
                         # De keten is nog niet klaar! Dwing de thread om te wachten.
                         target.fsm_state = 'EXECUTE'
                         return 
@@ -375,11 +423,6 @@ def _execute_cycleZ32(master_cpu, target):
             # is de berekening gegarandeerd voltooid en kan de Master veilig JOINEN.
             target.fsm_state = 'DONE'
             return
-
-            # # --- DE ONTSNAPPING ---
-            # # Als we hier komen, zijn álle cores die aan deze thread gekoppeld waren gegarandeerd klaar!
-            # target.fsm_state = 'DONE'
-            # return  # Stop direct met executeren voor deze thread, keer nooit meer terug naar FETCH!
 
         elif opcode == Op.JOIN:
             if target != master_cpu:

@@ -1,6 +1,6 @@
 # main.py
 from InmosZ32 import CPU
-from opcodes import Op, Reg, assembly_program, encrypt_program, context_test, context_test1
+from opcodes import Op, Reg, assembly_program, encrypt_program, context_test, context_test1, context_stress
 from assembler import assemble
 from frontpanel import FrontPanel
 
@@ -16,7 +16,7 @@ def run_test():
 
     # De assembler doet nu al het rekenwerk voor je!
     # test_program = assemble(encrypt_program)        # the source can be found in opcodes.py
-    test_program = assemble(context_test1)  
+    test_program = assemble(context_stress)  
     
     # Print even ter controle de gegenereerde machinecode integers
     print(f"Gegenereerde machinecode: {test_program}\n")

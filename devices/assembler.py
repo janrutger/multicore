@@ -60,7 +60,7 @@ def assemble(source_code: str) -> list:
             continue
 
         # FORMAT: ONE_ADDR (Sprongen naar labels of harde adressen, bijv. JMP, JMPF)
-        if mnemonic in ['JMP', 'JMPF', 'JMPT', 'CALL']:
+        if mnemonic in ['JMP', 'JMPF', 'JMPT', 'CALL', 'SUCCES', 'FAIL']:
             target = parts[1]
             # Check of het argument een bekend label is, anders aannemen dat het een getal is
             addr = labels[target] if target in labels else int(target)
