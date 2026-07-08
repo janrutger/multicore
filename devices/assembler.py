@@ -60,7 +60,7 @@ def assemble(source_code: str) -> list:
             continue
 
         # FORMAT: ONE_ADDR (Sprongen naar labels of harde adressen, bijv. JMP, JMPF)
-        if mnemonic in ['JMP', 'JMPF', 'JMPT', 'CALL', 'SUCCES', 'FAIL']:
+        if mnemonic in ['JMP', 'JMPF', 'JMPT', 'CALL', 'SUCCES', 'FAIL', 'SYNC']:
             target = parts[1]
             # Check of het argument een bekend label is, anders aannemen dat het een getal is
             addr = labels[target] if target in labels else int(target)
@@ -69,7 +69,7 @@ def assemble(source_code: str) -> list:
             continue
 
         # === FORMAT: ONE_REG (Bijv: INC K of DEC A) ===
-        if mnemonic in ['INC', 'DEC']:
+        if mnemonic in ['INC', 'DEC', 'RETURN']:
             reg1_str = parts[1].upper()
             if reg1_str not in REGISTERS:
                 raise SyntaxError(f"Onbekend register '{reg1_str}' op adres {current_address}")

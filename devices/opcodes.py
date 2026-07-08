@@ -20,8 +20,9 @@ class Op(IntEnum):
     CALLX = 25
     INT   = 26
 
-    SUCCES = 16
-    FAIL   = 17
+    SUCCES = 16      # Implemented
+    FAIL   = 17      # Implemented
+    SYNC   = 18      # Implemented
 
     # --- FORMAT: TWO_REG_VAL / TWO_REG_ADDR --- 
     LDI   = 31      # Implemented
@@ -64,11 +65,12 @@ class Op(IntEnum):
     CALLS = 95
     INC   = 80     # Implemented
     DEC   = 81     # Implemented
+    RETURN= 19
 
 # Vaste sets voor de decoder om snel het format te matchen
 FORMAT_ZERO        = {Op.HALT, Op.RET, Op.EI, Op.DI, Op.RTI, Op.CLOSE}
-FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.CALL, Op.CALLX, Op.INT, Op.SUCCES, Op.FAIL}
-FORMAT_ONE_REG     = {Op.PUSH, Op.POP, Op.GPU, Op.CALLS, Op.INC, Op.DEC}
+FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.CALL, Op.CALLX, Op.INT, Op.SUCCES, Op.FAIL, Op.SYNC}
+FORMAT_ONE_REG     = {Op.PUSH, Op.POP, Op.GPU, Op.CALLS, Op.INC, Op.DEC, Op.RETURN}
 FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.TSTE, Op.TSTG, Op.XOR}
 FORMAT_TWO_REG_VAL = {Op.LDI, Op.LDM, Op.LDX, Op.STO, Op.STX, Op.SHIFTL, Op.ROTL32, Op.SM32_RND, Op.CONTEXT, Op.JOIN, Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI}
 
@@ -586,7 +588,11 @@ SPAWN_LOOP:
     CONTEXT A THREAD_WORKER 
     FAIL MATRIX_FULL_HANDLER  
 
-    INC I               
+    INC I   
+
+    JOIN B SPAWN_LOOP
+    ADD X B
+
     JMP SPAWN_LOOP      
 
 MATRIX_FULL_HANDLER:
@@ -608,6 +614,9 @@ FLUSH_REMAINING:
     JMP FLUSH_REMAINING
 
 ALL_DONE:
+
+    SYNC FLUSH_REMAINING
+
     STO X 512           ; Sla het eindresultaat op op adres 512
     HALT                
 
@@ -615,9 +624,17 @@ ALL_DONE:
 ;  PARALLELLE WORKER THREAD CODE
 ; ==========================================================
 THREAD_WORKER:
+      
+
+    LDI M 42
+    LDI L 42
+    MUL M L
+
     LDI B 1             
-    MUL B A            
-    CLOSE
+    MUL B A  
+
+    RETURN B
+    ; CLOSE
 """
 
 

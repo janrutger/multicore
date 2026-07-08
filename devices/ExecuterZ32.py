@@ -354,6 +354,18 @@ def _execute_cycleZ32(master_cpu, target):
                 master_cpu.status = 1
             master_cpu.fsm_state = 'FETCH'
 
+        elif opcode == Op.SYNC:
+            # Check of er nog asynchrone contexts in de matrix draaien
+            if len(master_cpu.contexts) > 0:
+                # Er is nog activiteit! Spring direct naar het opgegeven adres
+                target.PC = arg2  # arg2 bevat het label-adres uit de assembly
+                master_cpu.status = 0
+            else:
+                # De matrix is volledig stilgevallen en leeg. Succes!
+                master_cpu.status = 1
+                target.fsm_state = 'FETCH' # Stroom geruisloos door naar de volgende regel
+
+
 
         # elif opcode == Op.CONTEXT:
         #     # Alleen de hoofd-CPU (master) mag threads (contexts) spawnen
@@ -384,8 +396,8 @@ def _execute_cycleZ32(master_cpu, target):
                 raise RuntimeError("Hardware Fault: Een sub-context probeerde zelf een CONTEXT te spawnen!")
                 
             # 1. HARDWARE HIGH-WATERMARK CHECK: 
-            # We hebben minimaal een buffer van 3 vrije cores nodig om deadlocks te voorkomen!
-            if len(master_cpu.free_cores) < 3:
+            # We hebben maximaal 10 cores per context nodig, om deadlocks te voorkomen een highwater mark van 10!
+            if len(master_cpu.free_cores) < 10:
                 master_cpu.status = 0          # Signaleer FAIL naar de CPU status
                 target.fsm_state = 'FETCH'     # NIET STALLEN! Ga direct naar de volgende instructie (FAIL)
                 return                         # Breek de CONTEXT-allocatie veilig af
@@ -400,6 +412,13 @@ def _execute_cycleZ32(master_cpu, target):
             # 4. Voeg hem toe aan de actieve contexts lijst
             master_cpu.contexts.append(nieuwe_ctx)
             target.fsm_state = 'FETCH'
+
+            # # === NIEUWE DEBUG PRINT REGEL ===
+            # ctx_id = len(master_cpu.contexts) - 1
+            # cores_over = len(master_cpu.free_cores)
+            # # \033[38;2;0;255;50m dwingt exact die giftige, felle 'blood green' af
+            # print(f"\033[38;2;0;255;50m[SPAWN] 🚀 Context #{ctx_id:02d} aangemaakt | Matrix pool: {cores_over} cores vrij\033[0m")
+            # # =================================
 
         elif opcode == Op.CLOSE:
             if target == master_cpu:
@@ -423,6 +442,34 @@ def _execute_cycleZ32(master_cpu, target):
             # is de berekening gegarandeerd voltooid en kan de Master veilig JOINEN.
             target.fsm_state = 'DONE'
             return
+
+        elif opcode == Op.RETURN:
+            if target == master_cpu:
+                raise RuntimeError("Hardware Fault: De master-CPU mag CLOSE niet aanroepen!")
+            
+            # We lopen door de registers van de context en contoleren of alles IDLE (context is echt klaar) is
+            for reg_val in target.registers.values():
+                if reg_val is not None:  # Dit is een Core-ID wijzer naar ons (eind)resultaat
+                    assigned_core = master_cpu.cores[reg_val]
+                    if assigned_core.coreStatus == 'WORKING':
+                        # De keten is nog niet klaar! Dwing de thread om te wachten.
+                        target.fsm_state = 'EXECUTE'
+                        return 
+            # Pas als álle cores in de registers van de thread de status 'VALID' hebben,
+            # is de berekening gegarandeerd voltooid en kan de Master veilig JOINEN.
+            target.fsm_state = 'DONE'
+
+
+            # SCHOONMAAKWERK: Zet alle overige uCores van deze thread-context op IDLE
+            for reg_idx, core_id in target.registers.items():
+                if core_id is not None:
+                    if reg_idx == reg1:
+                        continue
+                    master_cpu.cores[core_id].coreStatus = 'IDLE'
+
+            return
+            
+
 
         elif opcode == Op.JOIN:
             if target != master_cpu:
