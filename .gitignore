@@ -2,4 +2,5 @@ __pychache__/
 *.pyc
 my_python/
 .DS_Store
+WASTE/
 

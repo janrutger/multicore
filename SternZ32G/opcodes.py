@@ -65,7 +65,7 @@ class Op(IntEnum):
     CALLS = 95
     INC   = 80     # Implemented
     DEC   = 81     # Implemented
-    RETURN= 19
+    RETURN= 19    # Implemented
 
 # Vaste sets voor de decoder om snel het format te matchen
 FORMAT_ZERO        = {Op.HALT, Op.RET, Op.EI, Op.DI, Op.RTI, Op.CLOSE}
@@ -578,7 +578,7 @@ context_stress = """
 ; ==========================================================
     LDI A 5             ; Bronwaarde voor de threads (blijft ALTIJD 1)
     LDI I 0             ; Lus-teller I = 0
-    LDI Y 100            ; De doelwaarde (15 iteraties)
+    LDI Y 150            ; De doelwaarde (15 iteraties)
     LDI X 0             ; Totaalteller X = 0
     
 SPAWN_LOOP:
@@ -623,9 +623,7 @@ ALL_DONE:
 ; ==========================================================
 ;  PARALLELLE WORKER THREAD CODE
 ; ==========================================================
-THREAD_WORKER:
-      
-
+THREAD_WORKER: 
     LDI M 42
     LDI L 42
     MUL M L
@@ -634,7 +632,7 @@ THREAD_WORKER:
     MUL B A  
 
     RETURN B
-    ; CLOSE
+    ;CLOSE
 """
 
 
