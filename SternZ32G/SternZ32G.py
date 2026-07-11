@@ -6,61 +6,6 @@ from opcodes import context_stress
 from assembler import assemble
 from frontpanelZ32G import FrontPanel
 
-# class FrontPanel:
-#     def __init__(self, master_root, num_cores=32):
-#         """
-#         Geïntegreerd Frontpaneel dat meelift op de gedeelde root van het mainboard.
-#         Dit voorkomt Tkinter-overhead en multi-loop crashes.
-#         """
-#         self.root = master_root
-        
-#         # Optioneel: Je kunt de titel van de root hier overschrijven of aanpassen
-#         self.root.title("STERN-Z32 Central Dashboard & Frontpanel")
-        
-#         self.leds = []
-        
-#         # Dynamische grid-indeling (bijv. 8 kolommen breed voor 32 cores)
-#         kolommen = 8
-        
-#         # Bouw de LED-matrix op binnen de meegegeven root
-#         for i in range(num_cores):
-#             row = i // kolommen
-#             col = i % kolommen
-            
-#             # Frame voor de layout van deze specifieke core LED
-#             frame = tk.Frame(self.root, bg="#1e1e1e", padx=10, pady=10)
-#             frame.grid(row=row, column=col)
-            
-#             # De LED zelf (een Canvas cirkel)
-#             canvas = tk.Canvas(frame, width=30, height=30, bg="#1e1e1e", highlightthickness=0)
-#             canvas.pack()
-            
-#             # Teken de initiële rode (IDLE) cirkel
-#             circle = canvas.create_oval(2, 2, 28, 28, fill="#ff0000", outline="#3a3a3a")
-            
-#             # Label voor het Core ID
-#             label = tk.Label(frame, text=f"Core {i:02d}", fg="#888888", bg="#1e1e1e", font=("Courier", 8))
-#             label.pack()
-            
-#             self.leds.append((canvas, circle))
-            
-#     def update_cores(self, cores):
-#         """Update de kleuren van de LEDs live op basis van de werkelijke uCore statussen."""
-#         color_map = {
-#             'IDLE': '#ff0000',     # Fel rood
-#             'WORKING': '#ffaa00',  # Oranje/Geel
-#             'VALID': '#00ff00'     # Groen (Data staat klaar!)
-#         }
-        
-#         for i, core in enumerate(cores):
-#             # Veiligheidsklepje voor het geval de CPU minder cores heeft dan het paneel
-#             if i >= len(self.leds):
-#                 break
-                
-#             canvas, circle = self.leds[i]
-#             color = color_map.get(core.coreStatus, '#555555')
-#             canvas.itemconfig(circle, fill=color)
-
 
 
 class SternZ32Mainboard:
@@ -74,7 +19,7 @@ class SternZ32Mainboard:
         
         # 2. Initialiseer de CPU hardware matrix
         self.cpu = CPU()
-        self.show_log = False
+        self.show_log = True
         
         # 3. Koppel en bed (embed) het Frontpanel in deze root
         self.panel = FrontPanel(self.root, num_cores=32)
@@ -88,12 +33,13 @@ class SternZ32Mainboard:
             
         # Systeemtellers & Performance Tuning
         self.totale_ticks = 0
-        self.cycles_per_frame = 1  # Aantal CPU-ticks dat we per GUI-yield wegtikken
-        self.start_tijd = time.perf_counter()
+        self.cycles_per_frame = 500  # Aantal CPU-ticks dat we per GUI-yield wegtikken
+        # self.start_tijd = time.perf_counter()
 
     def start(self):
         """Start de master clock van de emulator en geeft de controle over aan Tkinter"""
         print("--- START CPU MATRIX SIMULATIE ---")
+        self.start_tijd = time.perf_counter()
         self.gameloop()
         self.root.mainloop()  # De hoofd event-loop van Tkinter draait nu het systeem
 
@@ -168,20 +114,42 @@ class SternZ32Mainboard:
         print(f"Snelheid:     {khz:.2f} kHz op de host machine.")
         print("==========================================================\n")
 
-        # --- MASTER CPU REGISTERS EINDSTATUS ---
+         # --- GEAVANCEERD MATRIX STATUS RAPPORT ---
+        print("\033[92m\n==========================================================")
+        print("                EINDSTATUS STERN MATRIX                   ")
         print("==========================================================")
-        print("             MASTER CPU REGISTERS EINDSTATUS              ")
-        print("==========================================================")
-        if hasattr(self.cpu, 'registers'):
-            # Netjes sorteren op register-index/naam indien mogelijk
-            for reg_name, reg_val in sorted(self.cpu.registers.items()):
-                # Map eventueel index terug naar letters voor de leesbaarheid
-                reg_labels = {0:'I', 1:'A', 2:'B', 3:'C', 4:'K', 5:'L', 6:'M', 7:'X', 8:'Y', 9:'Z'}
-                label = reg_labels.get(reg_name, f"R{reg_name}")
-                print(f"Register {label:<2} : {reg_val}")
-        print(f"Program Counter (PC) : {self.cpu.PC}")
-        print(f"Stack Pointer (SP)   : {self.cpu.SP}")
+        print(f"Vrije Cores over in wachtrij ({len(self.cpu.free_cores)}/32):\n {list(self.cpu.free_cores)}")
+        print("----------------------------------------------------------")
+        print(f"{'Core':<6} | {'Status':<8} | {'Waarde':<8} | {'Gekoppeld Register':<20}")
+        print("----------------------------------------------------------")
+        
+        reg_names = {0: "I (R0)", 1: "A (R1)", 2: "B (R2)", 3: "C (R3)", 4: "K (R4)", 
+                    5: "L (R5)", 6: "M (R6)", 7: "X (R7)", 8: "Y (R8)", 9: "Z (R9)"}
+        
+        core_to_reg = {}
+        for reg_id, core_id in self.cpu.registers.items():
+            if core_id is not None:
+                naam = reg_names.get(reg_id, f"R{reg_id}")
+                core_to_reg[core_id] = f"Register {naam}"
+                
+        if self.cpu.last_test_core is not None:
+            if self.cpu.last_test_core in core_to_reg:
+                core_to_reg[self.cpu.last_test_core] += " + Status (last_test)"
+            else:
+                core_to_reg[self.cpu.last_test_core] = "Status (last_test)"
+                
+        for c_id, core in enumerate(self.cpu.cores):
+            status = core.coreStatus
+            val = core.value
+            reg_naam = core_to_reg.get(c_id, "-")
+            
+            if reg_naam != "-":
+                print(f"Core {c_id:<2} | {status:<8} | {val:>10} | <-- {reg_naam}")
+            else:
+                print(f"Core {c_id:<2} | {status:<8} | {val:>10} | {reg_naam}")
+                
         print("==========================================================\n")
+
 
         # --- GEHEUGEN DUMP (Vaf 512 voor de cryptografie) ---
         print("==========================================================")
@@ -189,7 +157,7 @@ class SternZ32Mainboard:
         print("==========================================================")
         
         start_adres = 512
-        aantal_adressen = 50
+        aantal_adressen = 10
         
         for i in range(aantal_adressen):
             current_addr = start_adres + i
@@ -205,7 +173,9 @@ class SternZ32Mainboard:
                 label = " <-- Master Key (M)" if current_addr == 512 else ""
                 print(f"Adres {current_addr:<3} | Waarde: {waarde:>10} | Karakter: {char_repr:<5}{label}")
                 
-        print("==========================================================\n")
+        print("==========================================================\033[0m\n")
+
+        
 
         
 

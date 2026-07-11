@@ -27,16 +27,18 @@ Voorbeeld display
     Met de OUT Rx reg# instructie vullen we de IO-registers die het instructie blok vormen, kijk eerst of de write-flag op 0 staat.
     De IO-contoller heeft een write command-blok met:
         device type         karrakter           Grafisch
-        instruction         print               plot                (clear, move_cursor ....)
         value1              char-to-print       color-to-plot
         vaule2              -                   X-as
         value3              -                   y-ax
+        value4              -                   -                   (who knows)
+        instruction         print               plot                (clear, move_cursor ....)
 
-    IOSYNC zet de writeflag op 1 leest het commandblok en stuurt de gegevens door naar het device
-    en controleerd de read sectie voor actie, daarna keert IOSYNC terug
+        Door in het insstructie register te schrijven wordt de write-flag op 1 gezet
+
+    IOSYNC controleerd of er write werk te doen valt, leet het commandblok en stuurd de inhoudt naar het device
+    en zet de flag weer op 0
 
 
     Op de achtergrond op het mainboard in SternZ32 krijgen de devices die betaan een tick.
-    Daarmee verwerken ze de input en zetten de writeflag op 0 
-
-    (het toetsenbord device kijkt bij een tick of er fysieke KBD aanslagen zijn geweest, en zet deze in hetbuffer van de IO-controleer, maar blijft van de read flag af)
+    tijdens de tick worden de informatie verwerkt (output device buffert de input stream) 
+    het toetsenbord device kijkt bij een tick of er fysieke KBD aanslagen zijn geweest, en zet deze in het buffer van de IO-controleer.
