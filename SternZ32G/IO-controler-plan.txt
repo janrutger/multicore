@@ -42,3 +42,60 @@ Voorbeeld display
     Op de achtergrond op het mainboard in SternZ32 krijgen de devices die betaan een tick.
     tijdens de tick worden de informatie verwerkt (output device buffert de input stream) 
     het toetsenbord device kijkt bij een tick of er fysieke KBD aanslagen zijn geweest, en zet deze in het buffer van de IO-controleer.
+
+
+
+    Periferals <> IO Controller <> CPU
+
+
+    devices
+        Er zijn 3 periferal devices een 24x80 karakter display, een 480x640 grafisch display en een toetsenbord
+        De devices zijn gebassserd op Tkinter voor de intergratie met de fysieke hardware
+
+        de display devices hebben eigen display-memory en leunen niet op main memory
+        De display devices hebben meerdere instructies
+        Karacter device:
+            - print
+            - clear             Clear screen
+            - setcursor
+        Grafisch
+            - plot
+            - clear             Clear screen
+        
+        Karakter device doet line-wrapping wanneer de regel lengte van 80 wordt overschreden en doet screenscrolling wanneer het aantal van 24 regels wordt overschreden
+        het grafische device vangen we de clipping op door wardes buiten bereik te negeren en weg tegooien
+    
+    IO Controller
+        Voor de communicatie met de CPU heeft de IO-controler de volgende registers
+        -   reg0        devicetype/ID   1=karacter 2=Grafisch
+        -   reg1        value1          char to print, of color to print
+        -   reg2        value2          X-coordinate
+        -   reg3        value3          Y-coordinate
+        -   reg4        value4          Gereserveerd voor later
+        -   reg5        instruction     1=print, 2=plot, 3=clear, 4=setcursor
+                                        writing to reg5 triggers the write-flag to 1
+        -   reg6        KBD-value1      reading from reg6 resets the read-flag to 0
+
+    CPU(InmosZ32)
+        De volgens CPU instructies zijn nodig
+        OUT Rx reg#         Controleert het write-flag
+                            als write-flag = 0, Schrijf Rx naar regx
+                            als wirte-flag = 1, Stall de CPU
+
+        IOSYNC              write sectie:
+                                leest de command registers
+                                Write-flag = 1, stuur de inforamtie naar het device, zet write-flag = 0
+                                Write-flag = 0, doe niks
+
+                            read sectie
+                                Leest het hardware keyboard buffer
+                                als read-flag = 0 en er input beschikbaar is schrijf eerste waarde naar reg6
+                                zet de read-flag op 1
+
+                                Als er geen data beschikbaar is in het hardware buffer, schrijf 0 (null) naar reg6 en read-flag op 0
+
+        IN Rx reg6          Leest reg6 en schrijft dezze naar Rx
+                            zet de read-flag naar 0
+
+                            (progammmeur moet zelf de inhoud van Rx controleren en testen op null)
+                   

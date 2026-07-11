@@ -33,7 +33,7 @@ class SternZ32Mainboard:
             
         # Systeemtellers & Performance Tuning
         self.totale_ticks = 0
-        self.cycles_per_frame = 500  # Aantal CPU-ticks dat we per GUI-yield wegtikken
+        self.cycles_per_frame = 50  # Aantal CPU-ticks dat we per GUI-yield wegtikken
         # self.start_tijd = time.perf_counter()
 
     def start(self):
