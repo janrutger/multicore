@@ -5,10 +5,11 @@ class Op(IntEnum):
     # --- FORMAT: ZERO ---
     NOP   = 10
     HALT  = 11      # Implemented
-    RET   = 12
-    EI    = 13
-    DI    = 14
-    RTI   = 15
+    IOSYNC= 12      # NEW: Non-blocking tick voor de IO-controller
+    # RET   = 12
+    # EI    = 13
+    # DI    = 14
+    # RTI   = 15
 
     CLOSE = 29      # Implemented
 
@@ -16,9 +17,9 @@ class Op(IntEnum):
     JMPF  = 20      # Implemented
     JMPT  = 21      # Implemented
     JMP   = 22      # Implemented
-    CALL  = 24
-    CALLX = 25
-    INT   = 26
+    # CALL  = 24
+    # CALLX = 25
+    # INT   = 26
 
     SUCCES = 16      # Implemented
     FAIL   = 17      # Implemented
@@ -28,6 +29,8 @@ class Op(IntEnum):
     LDI   = 31      # Implemented
     LDM   = 32      # Implemented
     LDX   = 33      # Implemented
+    OUT   = 34      # NEW: Schrijf register Rx naar IO reg#
+    IN    = 35      # NEW: Lees IO reg# naar register Rx
     STO   = 40      # Implemented
     STX   = 41      # Implemented
     ADDI  = 51
@@ -36,8 +39,8 @@ class Op(IntEnum):
     DIVI  = 63
     TST   = 70
     ANDI  = 82
-    STACK = 92
-    USTACK= 93
+    # STACK = 92
+    # USTACK= 93
 
     CONTEXT = 27      # Implemented
     JOIN    = 28      # Implemented
@@ -59,20 +62,25 @@ class Op(IntEnum):
     
 
     # --- FORMAT: ONE_REG ---
-    PUSH  = 90
-    POP   = 91
-    GPU   = 94
-    CALLS = 95
+    # PUSH  = 90
+    # POP   = 91
+    # GPU   = 94
+    # CALLS = 95
     INC   = 80     # Implemented
     DEC   = 81     # Implemented
     RETURN= 19    # Implemented
 
 # Vaste sets voor de decoder om snel het format te matchen
-FORMAT_ZERO        = {Op.HALT, Op.RET, Op.EI, Op.DI, Op.RTI, Op.CLOSE}
-FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.CALL, Op.CALLX, Op.INT, Op.SUCCES, Op.FAIL, Op.SYNC}
-FORMAT_ONE_REG     = {Op.PUSH, Op.POP, Op.GPU, Op.CALLS, Op.INC, Op.DEC, Op.RETURN}
+FORMAT_ZERO        = {Op.NOP, Op.HALT, Op.CLOSE, Op.IOSYNC}
+FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.SUCCES, Op.FAIL, Op.SYNC}
+FORMAT_ONE_REG     = {Op.INC, Op.DEC, Op.RETURN}
 FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.TSTE, Op.TSTG, Op.XOR}
-FORMAT_TWO_REG_VAL = {Op.LDI, Op.LDM, Op.LDX, Op.STO, Op.STX, Op.SHIFTL, Op.ROTL32, Op.SM32_RND, Op.CONTEXT, Op.JOIN, Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI}
+FORMAT_TWO_REG_VAL = {
+    Op.LDI, Op.LDM, Op.LDX, Op.OUT, Op.IN, Op.STO, Op.STX, 
+    Op.SHIFTL, Op.ROTL32, Op.SM32_RND, Op.CONTEXT, Op.JOIN, 
+    Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI
+}
+
 
 class Reg(IntEnum):
     I  = 0  # Index Register (Vaste hardware-koppeling voor LDX/STX)
@@ -636,7 +644,58 @@ THREAD_WORKER:
 """
 
 
+display_test = """
+; ==============================================================================
+;  STERN-Z32 PLATFORM: FULL PERIPHERAL INTEGRATION TEST
+;  Doel: KBD input uitlezen, echoën naar TextDisplay en plotten op GraphDisplay
+; ==============================================================================
 
+    LDI Z 0             ; Register Z = 0 (Gebruikt voor de NULL-check van KBD)
+    LDI Y 1             ; Register Y = 1 (Constante voor Device Type 1: Karakter)
+    LDI X 2             ; Register X = 2 (Constante voor Device Type 2: Grafisch)
+    LDI L 27
+
+    ; We zetten alvast een vaste startpositie klaar voor het grafische display
+    LDI B 100           ; B = X-as coördinaat (start op 100)
+    LDI C 100           ; C = Y-as coördinaat (start op 100)
+
+IO_POLL_LOOP:
+    IOSYNC              ; Geef de IO-controller een kloktik om buffers te verversen
+    
+    ; --- STAP 1: LEES KEYBOARD ---
+    IN A 6              ; Lees invoerreg6 (KBD) uit naar Register A
+    TSTE A Z            ; Vergelijk de ingelezen waarde met 0 (NULL)
+    JMPT IO_POLL_LOOP   ; Als A == 0 (geen toets ingedrukt), vlieg direct terug in de lus
+
+    TSTE A L
+    JMPT END
+
+    ; --- STAP 2: ECHO NAAR CHARACTER DISPLAY ---
+    OUT Y 0             ; Schrijf Devicetype 1 (Karakter) naar reg0
+    OUT A 1             ; Schrijf de ASCII-waarde van de toets naar reg1 (value1)
+    LDI K 1             ; Instructie 1 = Print karakter
+    OUT K 5             ; Schrijf naar reg5 -> activeert de write_flag!
+
+    IOSYNC
+
+    ; --- STAP 3: PLOT SYNCHROON OP GRAPHICAL DISPLAY ---
+    OUT X 0             ; Schrijf Devicetype 2 (Grafisch) naar reg0
+    LDI K 2             ; Kleurcode 2 (Rood) naar Register K
+    OUT K 1             ; Schrijf kleur naar reg1 (value1)
+    OUT B 2             ; Schrijf huidige X-coördinaat (B) naar reg2 (value2)
+    OUT C 3             ; Schrijf huidige Y-coördinaat (C) naar reg3 (value3)
+    LDI K 2             ; Instructie 2 = Plot pixel
+    OUT K 5             ; Schrijf naar reg5 -> activeert de write_flag!
+
+    ; --- STAP 4: UPDATE PARAMETERS VOOR HET VOLGENDE KARAKTER ---
+    INC B               ; Verschuif de X-as voor de volgende plot (schuin lijntje)
+    INC C               ; Verschuif de Y-as
+    
+    JMP IO_POLL_LOOP    ; Spring terug en wacht op de volgende toetsaanslag
+
+END:
+    HALT
+"""
 
 
 

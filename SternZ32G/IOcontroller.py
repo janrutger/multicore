@@ -44,6 +44,7 @@ class IOController:
             char_code = ord(event.char)
             self.kbd_buffer.append(char_code)
 
+
     # --- CPU BUS INTERFACE INSTRUCTIES ---
 
     def cpu_out(self, reg_num, value):

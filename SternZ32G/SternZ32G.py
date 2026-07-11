@@ -1,31 +1,42 @@
-# SternZ32.py
+# SternZ32G.py
 import tkinter as tk
 import time
-from InmosZ32 import CPU
-from opcodes import context_stress
+from InmosZ32G import CPU
+from opcodes import context_stress, display_test
 from assembler import assemble
 from frontpanelZ32G import FrontPanel
-
+from IOcontroller import IOController  # Importeer de nieuwe IO-chip!
 
 
 class SternZ32Mainboard:
     def __init__(self):
         print("--- INITIALISEER STERN-Z32 PLATFORM (EVENT-DRIVEN) ---")
         
-        # 1. Start de Master GUI Root die het ritme bepaalt
+        # 1. Start de Master GUI Root die het ritme en de venster-contexts bepaalt
         self.root = tk.Tk()
         self.root.title("STERN-Z32 Mainboard Central Clock")
         self.root.configure(bg="#1e1e1e")
         
-        # 2. Initialiseer de CPU hardware matrix
+        # 2. Initialiseer de CPU hardware matrix (32 cores + context switches)
         self.cpu = CPU()
         self.show_log = True
         
-        # 3. Koppel en bed (embed) het Frontpanel in deze root
+        # 3. UPGRADE: Soldeer de IOController op het mainboard chipset-vlak
+        # We geven de master root mee zodat de schermen en toetsenbord-bindings direct werken
+        self.io_controller = IOController(self.root)
+
+        # Koppel het toetsenbord
+        self.root.bind("<Key>", self.io_controller.hardware_keyboard_callback)
+        
+        # Koppel de IO-controller ook direct aan de CPU, zodat OUT/IN/IOSYNC hardware-instructies
+        # direct via de interne bus met self.io_controller kunnen praten.
+        self.cpu.IO(self.io_controller)           # Solder jumper when the right CPU is installed
+        
+        # 4. Koppel en bed (embed) het Frontpanel in deze root
         self.panel = FrontPanel(self.root, num_cores=32)
         
-        # 4. Vertaal het testprogramma via de assembler en laad het in het geheugen
-        test_program = assemble(context_stress)  
+        # 5. Vertaal het testprogramma via de assembler en laad het in het geheugen
+        test_program = assemble(display_test)  
         print(f"Gegenereerde machinecode: {test_program}\n")
         
         for adres, machine_woord in enumerate(test_program):
@@ -34,27 +45,26 @@ class SternZ32Mainboard:
         # Systeemtellers & Performance Tuning
         self.totale_ticks = 0
         self.cycles_per_frame = 50  # Aantal CPU-ticks dat we per GUI-yield wegtikken
-        # self.start_tijd = time.perf_counter()
 
     def start(self):
         """Start de master clock van de emulator en geeft de controle over aan Tkinter"""
-        print("--- START CPU MATRIX SIMULATIE ---")
+        print("--- START CPU MATRIX + IO SIMULATIE ---")
         self.start_tijd = time.perf_counter()
         self.gameloop()
         self.root.mainloop()  # De hoofd event-loop van Tkinter draait nu het systeem
 
-
-
-
     def gameloop(self):
-        """De ononderbroken klok-trein (Heartbeat) van de Inmos-Z32"""
+        """De ononderbroken klok-trein (Heartbeat) van de Inmos-Z32 en IO-Controller"""
     
-        # 1. Bestook de CPU met een batch kloktikken (in jouw geval 1)
+        # 1. Bestook de CPU en chipset met een batch kloktikken
         for _ in range(self.cycles_per_frame):
             if not self.cpu.is_completely_idle():
-                 # Voer de werkelijke hardware tick uit
+                # Voer de werkelijke hardware tick uit op de CPU
                 self.cpu.tick()
-                # self.io_controller.tick(self.cpu)
+                
+                # ENKELE TICK VOOR DE IO CONTROLLER (Achtergrond-renderers van displays verversen)
+                self.io_controller.tick()
+                
                 self.totale_ticks += 1
 
                 if self.show_log:
@@ -88,7 +98,7 @@ class SternZ32Mainboard:
         # 2. BINNEN-FRAME REFRESH: Update de uCore LEDs op het frontpaneel
         self.panel.update_cores(self.cpu.cores)
         
-        # Dwing Tkinter om de LEDs direct te hertekenen
+        # Dwing Tkinter om de LEDs en aangesloten IO-peripherals direct te hertekenen
         self.root.update_idletasks() 
 
         # 3. STOP CONDITIE: Als de CPU op HALT staat en alle cores idle zijn, stoppen we de klok
@@ -101,11 +111,11 @@ class SternZ32Mainboard:
             self.print_eindrapportage(totale_tijd, khz)
             return  # Stop de gameloop definitief
 
-        # 4. Naar de volgende tick!
+        # 4. Naar de volgende kloktik!
         self.root.after(0, self.gameloop)
 
     def print_eindrapportage(self, totale_tijd, khz):
-        """Drukt de complete eindstatus en geheugendump af voor krachtig debuggen."""
+        """Drukt de complete eindstatus en geheugendump af."""
         print("\n==========================================================")
         print("             SIMULATIE SUCCESVOL BEËINDIGD                ")
         print("==========================================================")
@@ -114,7 +124,7 @@ class SternZ32Mainboard:
         print(f"Snelheid:     {khz:.2f} kHz op de host machine.")
         print("==========================================================\n")
 
-         # --- GEAVANCEERD MATRIX STATUS RAPPORT ---
+        # --- GEAVANCEERD MATRIX STATUS RAPPORT ---
         print("\033[92m\n==========================================================")
         print("                EINDSTATUS STERN MATRIX                   ")
         print("==========================================================")
@@ -150,8 +160,7 @@ class SternZ32Mainboard:
                 
         print("==========================================================\n")
 
-
-        # --- GEHEUGEN DUMP (Vaf 512 voor de cryptografie) ---
+        # --- GEHEUGEN DUMP (Vanaf 512 voor de cryptografie) ---
         print("==========================================================")
         print("             GEHEUGEN DUMP (Adres 512 t/m 562)            ")
         print("==========================================================")
@@ -164,7 +173,6 @@ class SternZ32Mainboard:
             if current_addr < self.cpu.memory.memSize():
                 waarde = self.cpu.memory.memRead(current_addr)
                 
-                # Vertaal naar karakter als het binnen de leesbare ASCII-reeks valt
                 if 32 <= waarde <= 126:
                     char_repr = f"'{chr(waarde)}'"
                 else:
@@ -175,13 +183,8 @@ class SternZ32Mainboard:
                 
         print("==========================================================\033[0m\n")
 
-        
-
-        
 
 # --- DIRECTE UITVOERING ---
 if __name__ == "__main__":
     mainboard = SternZ32Mainboard()
     mainboard.start()
-
-    
