@@ -37,6 +37,7 @@ class IOController:
         
         # Initialiseer Toetsenbord-hardware binding op het hoofdvenster
         self.root.bind("<Key>", self.hardware_keyboard_callback)
+        
 
     def hardware_keyboard_callback(self, event):
         """Achtergrond-tick interceptor: Vangt fysieke sleutels op en buffert ze."""

@@ -2,8 +2,8 @@
 import tkinter as tk
 import time
 from InmosZ32G import CPU
-from opcodes import context_stress, display_test
-from assembler import assemble
+from opcodes import context_stress, display_test, encrypt_program
+from assemblerV2 import assemble
 from frontpanelZ32G import FrontPanel
 from IOcontroller import IOController  # Importeer de nieuwe IO-chip!
 
@@ -25,9 +25,6 @@ class SternZ32Mainboard:
         # We geven de master root mee zodat de schermen en toetsenbord-bindings direct werken
         self.io_controller = IOController(self.root)
 
-        # Koppel het toetsenbord
-        self.root.bind("<Key>", self.io_controller.hardware_keyboard_callback)
-        
         # Koppel de IO-controller ook direct aan de CPU, zodat OUT/IN/IOSYNC hardware-instructies
         # direct via de interne bus met self.io_controller kunnen praten.
         self.cpu.IO(self.io_controller)           # Solder jumper when the right CPU is installed
@@ -36,7 +33,7 @@ class SternZ32Mainboard:
         self.panel = FrontPanel(self.root, num_cores=32)
         
         # 5. Vertaal het testprogramma via de assembler en laad het in het geheugen
-        test_program = assemble(display_test)  
+        test_program = assemble(encrypt_program)  
         print(f"Gegenereerde machinecode: {test_program}\n")
         
         for adres, machine_woord in enumerate(test_program):

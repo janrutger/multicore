@@ -655,12 +655,14 @@ display_test = """
     LDI X 2             ; Register X = 2 (Constante voor Device Type 2: Grafisch)
     LDI L 27
 
+    CONTEXT Z REFRESH
+
     ; We zetten alvast een vaste startpositie klaar voor het grafische display
     LDI B 100           ; B = X-as coördinaat (start op 100)
     LDI C 100           ; C = Y-as coördinaat (start op 100)
 
 IO_POLL_LOOP:
-    IOSYNC              ; Geef de IO-controller een kloktik om buffers te verversen
+    ; IOSYNC              ; Geef de IO-controller een kloktik om buffers te verversen
     
     ; --- STAP 1: LEES KEYBOARD ---
     IN A 6              ; Lees invoerreg6 (KBD) uit naar Register A
@@ -676,7 +678,7 @@ IO_POLL_LOOP:
     LDI K 1             ; Instructie 1 = Print karakter
     OUT K 5             ; Schrijf naar reg5 -> activeert de write_flag!
 
-    IOSYNC
+    ; IOSYNC
 
     ; --- STAP 3: PLOT SYNCHROON OP GRAPHICAL DISPLAY ---
     OUT X 0             ; Schrijf Devicetype 2 (Grafisch) naar reg0
@@ -695,6 +697,10 @@ IO_POLL_LOOP:
 
 END:
     HALT
+
+REFRESH:
+    IOSYNC
+    JMP REFRESH
 """
 
 

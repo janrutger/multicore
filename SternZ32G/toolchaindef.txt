@@ -1,0 +1,44 @@
+Voor het verbeteren van mijn toolchain
+
+
+De SternZ32G developer board heeft 1K memory om mee te werken
+de CPU InmosZ32G is een wonder van a-synchroniteit met 32-ucore's en multicontext ingebouwd in de instructie set can de CPU en executerlogica van de CPU
+
+het moet een beschrijvende taal worden
+
+MAP {                           Maakt een geheugen map aan
+    START   main                resultaat zet jmp main op adres 0
+    RES     var1    1           reserveert 1 geheugen adres var1 vanaf 1
+    RES     lst1    10          reserveert 10 adressen lst1
+
+    # --- CONSTANTEN (Nemen geen geheugenruimte in) ---
+    CONST   MAX_LOOPS   100     Maximaal aantal iteraties (100)
+
+    # --- INTERRUPT-VRIJE IO POORTEN (Hardware mapping) ---
+    # Het out commando kijkt of deze IO-constate bestaat, om schrijffouten te elimineren
+    IO      X-value   2         IO register 2 wordt gebruikt voor de X-value
+    IO      Y-value   3         IO register 3 wordt gebruikt voor de Y-value 
+
+    .main                       Volgorde van programma, start adres
+    .context_name1              gevolgd door de contexten
+    .context_name2
+}
+
+PROGRAM {                       programma code
+    main:
+        LDI A 10
+        CONTEXT A context_name1
+        ....
+        CONTEXT B context_name2
+        HALT
+
+    context_name1:
+        .....
+        .....
+        RETURN A
+
+    context_name2:
+        .....
+        .....
+        RETURN B
+}
