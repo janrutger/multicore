@@ -9,7 +9,7 @@ TOKEN_TYPES = [
     ('COMMENT',       r'//.*'),       
     ('MAP_BLOCK',     r'\bMAP\b'),
     ('PROG_BLOCK',    r'\bPROGRAM\b'),
-    ('KEYWORD',       r'\b(void|register|if|else|for|while|CONTEXT)\b'),
+    ('KEYWORD',       r'\b(void|register|if|else|for|while)\b'),
     ('IDENTIFIER',    r'\b[a-zA-Z_][a-zA-Z0-9_]*\b'),
     ('NUMBER',        r'\b\d+\b'),
     ('LBRACE',        r'\{'),

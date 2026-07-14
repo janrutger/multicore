@@ -33,7 +33,7 @@ class SternZ32Mainboard:
         self.panel = FrontPanel(self.root, num_cores=32)
         
         # 5. Vertaal het testprogramma via de assembler en laad het in het geheugen
-        test_program = assemble(encrypt_program)  
+        test_program = assemble(context_stress)  
         print(f"Gegenereerde machinecode: {test_program}\n")
         
         for adres, machine_woord in enumerate(test_program):

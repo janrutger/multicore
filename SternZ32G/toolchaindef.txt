@@ -19,9 +19,9 @@ MAP {                           Maakt een geheugen map aan
     IO      X-value   2         IO register 2 wordt gebruikt voor de X-value
     IO      Y-value   3         IO register 3 wordt gebruikt voor de Y-value 
 
-    .main                       Volgorde van programma, start adres
-    .context_name1              gevolgd door de contexten
-    .context_name2
+    
+    CONTEXT_ENTRY   context_name1   
+    CONTEXT_ENTRY   context_name2
 }
 
 PROGRAM {                       programma code
