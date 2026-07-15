@@ -225,11 +225,11 @@ class SternZ32Mainboard:
 
         # --- GEHEUGEN DUMP (Vanaf 512 voor de cryptografie) ---
         print("==========================================================")
-        print("             GEHEUGEN DUMP (Adres 512 t/m 562)            ")
+        print("             GEHEUGEN DUMP (Adres 1023 - 23)              ")
         print("==========================================================")
         
-        start_adres = 512
-        aantal_adressen = 10
+        start_adres = 1024 - 23
+        aantal_adressen = 24
         
         for i in range(aantal_adressen):
             current_addr = start_adres + i

@@ -5,12 +5,16 @@ start: _NL? map_block _NL? program_block _NL?
 map_block: "MAP" _NL? "{" (_NL | map_directive)* "}"
 
 // We halen de verplichte _NL aan het einde van de directive weg, omdat de map_block-regel de newlines nu zelf opvangt
-?map_directive: start_stmt | res_stmt | const_stmt | io_stmt | macro_def
+# ?map_directive: start_stmt | res_stmt | const_stmt | io_stmt | macro_def
+# Voeg deze directives toe aan ?map_directive:
+?map_directive: start_stmt | res_stmt | const_stmt | io_stmt | memsize_stmt | sp_stmt | macro_def
 
-start_stmt: "START" IDENTIFIER
-res_stmt:   "RES" IDENTIFIER INT
-const_stmt: "CONST" IDENTIFIER INT
-io_stmt:    "IO" IDENTIFIER INT
+memsize_stmt: "MEMSIZE" INT
+sp_stmt:      "SP" INT
+start_stmt:   "START" IDENTIFIER
+res_stmt:     "RES" IDENTIFIER INT
+const_stmt:   "CONST" IDENTIFIER INT
+io_stmt:      "IO" IDENTIFIER INT
 
 macro_def:  "MACRO" IDENTIFIER "(" [param_list] ")" "{" _NL? (instruction _NL)+ "}"
 param_list: IDENTIFIER ("," IDENTIFIER)*
@@ -27,7 +31,8 @@ label_def: IDENTIFIER ":"
 instruction: MNEMONIC [argument (","? argument)*]
 ?argument: REGISTER | IDENTIFIER | INT
 
-macro_call: IDENTIFIER "(" [arg_list] ")"
+# Nieuwe regel (maakt de haakjes optioneel):
+macro_call: IDENTIFIER ["(" [arg_list] ")"]
 arg_list:   argument (","? argument)*
 
 // We gebruiken \\b (word boundaries) en geven ze prioriteit .2 zodat ze nóóit binnen langere woorden matchen

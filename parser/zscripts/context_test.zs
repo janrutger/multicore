@@ -1,6 +1,23 @@
 MAP {
     START   main
+    MEMSIZE 1024
+    SP 10
+
+    RES adres 1
+   
+
+    CONST bron 5
+    CONST itter 15
+
     IO      X_value   2
+
+    MACRO INIT(arg1, arg2) {
+        LDI A arg1             ; Bronwaarde voor de threads 
+        LDI I 0             ; Lus-teller I = 0
+        LDI Y arg2            ; De doelwaarde (15 iteraties)
+        LDI X 0             ; Totaalteller X = 0
+    }
+
     MACRO SET_AND_OUT(reg, waarde, poort) {
         LDI reg, waarde
         OUT reg, poort
@@ -11,10 +28,7 @@ PROGRAM {
 ; ==========================================================
 ;  15x CONTEXT STRESSTEST (Gecorrigeerd)
 ; ==========================================================
-    LDI A 5             ; Bronwaarde voor de threads (blijft ALTIJD 1)
-    LDI I 0             ; Lus-teller I = 0
-    LDI Y 150            ; De doelwaarde (15 iteraties)
-    LDI X 0             ; Totaalteller X = 0
+INIT(bron, itter)
 
 SPAWN_LOOP:
     TSTE I Y            
@@ -52,7 +66,7 @@ ALL_DONE:
 
     SYNC FLUSH_REMAINING
 
-    STO X 512           ; Sla het eindresultaat op op adres 512
+    STO X adres           ; Sla het eindresultaat op op adres 512
     HALT                
 
 ; ==========================================================
