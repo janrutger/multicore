@@ -1,6 +1,52 @@
+# # SternZ32G.py
+# import tkinter as tk
+# import time
+# from InmosZ32G import CPU
+# from opcodes import context_stress, display_test, encrypt_program
+# from assemblerV2 import assemble
+# from frontpanelZ32G import FrontPanel
+# from IOcontroller import IOController  # Importeer de nieuwe IO-chip!
+
+
+# class SternZ32Mainboard:
+#     def __init__(self):
+#         print("--- INITIALISEER STERN-Z32 PLATFORM (EVENT-DRIVEN) ---")
+        
+#         # 1. Start de Master GUI Root die het ritme en de venster-contexts bepaalt
+#         self.root = tk.Tk()
+#         self.root.title("STERN-Z32 Mainboard Central Clock")
+#         self.root.configure(bg="#1e1e1e")
+        
+#         # 2. Initialiseer de CPU hardware matrix (32 cores + context switches)
+#         self.cpu = CPU()
+#         self.show_log = True
+        
+#         # 3. UPGRADE: Soldeer de IOController op het mainboard chipset-vlak
+#         # We geven de master root mee zodat de schermen en toetsenbord-bindings direct werken
+#         self.io_controller = IOController(self.root)
+
+#         # Koppel de IO-controller ook direct aan de CPU, zodat OUT/IN/IOSYNC hardware-instructies
+#         # direct via de interne bus met self.io_controller kunnen praten.
+#         self.cpu.IO(self.io_controller)           # Solder jumper when the right CPU is installed
+        
+#         # 4. Koppel en bed (embed) het Frontpanel in deze root
+#         self.panel = FrontPanel(self.root, num_cores=32)
+        
+#         # 5. Vertaal het testprogramma via de assembler en laad het in het geheugen
+#         test_program = assemble(context_stress)  
+#         print(f"Gegenereerde machinecode: {test_program}\n")
+        
+#         for adres, machine_woord in enumerate(test_program):
+#             self.cpu.memory.memWrite(machine_woord, adres)
+            
+#         # Systeemtellers & Performance Tuning
+#         self.totale_ticks = 0
+#         self.cycles_per_frame = 50  # Aantal CPU-ticks dat we per GUI-yield wegtikken
 # SternZ32G.py
 import tkinter as tk
 import time
+import sys
+import os
 from InmosZ32G import CPU
 from opcodes import context_stress, display_test, encrypt_program
 from assemblerV2 import assemble
@@ -22,19 +68,39 @@ class SternZ32Mainboard:
         self.show_log = True
         
         # 3. UPGRADE: Soldeer de IOController op het mainboard chipset-vlak
-        # We geven de master root mee zodat de schermen en toetsenbord-bindings direct werken
         self.io_controller = IOController(self.root)
 
-        # Koppel de IO-controller ook direct aan de CPU, zodat OUT/IN/IOSYNC hardware-instructies
-        # direct via de interne bus met self.io_controller kunnen praten.
+        # Koppel de IO-controller ook direct aan de CPU
         self.cpu.IO(self.io_controller)           # Solder jumper when the right CPU is installed
         
         # 4. Koppel en bed (embed) het Frontpanel in deze root
         self.panel = FrontPanel(self.root, num_cores=32)
         
-        # 5. Vertaal het testprogramma via de assembler en laad het in het geheugen
-        test_program = assemble(context_stress)  
-        print(f"Gegenereerde machinecode: {test_program}\n")
+        # 5. NIEUW: Dynamisch firmware laden vanuit .bin of terugvallen op de default test_program
+        test_program = []
+        
+        # Controleer of er een extern bestand is meegegeven via de command line
+        if len(sys.argv) > 1:
+            firmware_pad = sys.argv[1]
+            if os.path.exists(firmware_pad):
+                print(f"Firmware gevonden! Laden van: {firmware_pad}")
+                try:
+                    with open(firmware_pad, "r") as f:
+                        # Lees elke regel, strip whitespace en converteer naar integer
+                        test_program = [int(line.strip()) for line in f if line.strip()]
+                    print(f"Firmware succesvol geladen ({len(test_program)} instructies).")
+                except ValueError as e:
+                    print(f"Fout tijdens parsen van {firmware_pad}. Is het bestand corrupt?", file=sys.stderr)
+                    sys.exit(1)
+            else:
+                print(f"Fout: Opgegeven firmwarebestand '{firmware_pad}' niet gevonden!", file=sys.stderr)
+                sys.exit(1)
+        else:
+            # Fallback op de klassieke ingebouwde assembler-methode als er geen argument is
+            print("Geen externe firmware opgegeven. Fallback naar ingebouwde 'context_stress'...")
+            test_program = assemble(encrypt_program)  
+        
+        print(f"Gegenereerde/Geladen machinecode: {test_program}\n")
         
         for adres, machine_woord in enumerate(test_program):
             self.cpu.memory.memWrite(machine_woord, adres)

@@ -1,5 +1,6 @@
 from lark import Lark, Transformer
 from grammer import grammar
+from assemblerV3 import assemble
 
 class MacroExpander(Transformer):
     def __init__(self):
@@ -105,19 +106,17 @@ class MacroExpander(Transformer):
         return "\n".join(lines)
 
     def start(self, items):
-        # items[1] is het program_block (omdat items[0] het map_block is dat nu None is)
         program_code = items[1]
         
         # --- DE FINALE PAS: Vervang alle bekende constanten/IO-labels door hun waarde ---
         for symbol, info in self.symbol_table.items():
-            # info is nu een dict, bijv: {"type": "IO", "value": 2}
-            # We pakken de daadwerkelijke waarde en maken er een string van voor re.sub
             actual_value = str(info["value"])
             
             import re
             program_code = re.sub(rf'\b{symbol}\b', actual_value, program_code)
             
         return program_code
+            
 
 # --- TEST MET JOUW INPUT ---
 # source_code = """
@@ -150,51 +149,80 @@ MAP {
 }
 
 PROGRAM {
-    main:
-    LDI M 287454020    
-    STO M 512           ; Adres 1: Sla op op 512
-    LDI A 55            ; Adres 2: Bereid invoerwaarde voor de thread voor
-    STO A 513           ; Adres 3: Sla PIN op op 513
+; ==========================================================
+;  15x CONTEXT STRESSTEST (Gecorrigeerd)
+; ==========================================================
+    LDI A 5             ; Bronwaarde voor de threads (blijft ALTIJD 1)
+    LDI I 0             ; Lus-teller I = 0
+    LDI Y 150            ; De doelwaarde (15 iteraties)
+    LDI X 0             ; Totaalteller X = 0
 
-    ; Start de parallelle thread! 
-    ; Register A (waarde 55) wordt meegegeven als start-uCore.
-    ; Het startadres van de thread-code begint exact op Adres 12.
-    ; CONTEXT A 12        ; Adres 4: Lanceer THREAD_START op PC=12
-    CONTEXT A THREAD_START
+SPAWN_LOOP:
+    TSTE I Y            
+    JMPT FLUSH_REMAINING 
 
-    ; Terwijl de thread asynchroon draait, doet de hoofd-CPU hier nuttig werk
-    LDI B 10            ; Adres 5: R2 (B) = 10
-    LDI X 10
-    MUL B X             ; Adres 6: B = 10 * 10 = 100
-    STO B 500           ; Adres 7: Sla 100 op op adres 500
+    CONTEXT A THREAD_WORKER 
+    FAIL MATRIX_FULL_HANDLER  
 
-    ; Jouw geïntegreerde JOIN-lus:
-    ; We proberen te joinen. Als de thread NIET klaar is (fsm_state != 'DONE'),
-    ; dan springt de hardware direct terug naar Adres 8 (zichzelf) en faalt de join.
-    ; Als de thread WEL klaar is, oogst hij het resultaat in C en loopt de PC door naar 9.
-WAIT_FOR_THREAD:
-    ; JOIN A 9            ; Adres 8: Probeer te joinen in C. Indien niet klaar, spring naar 8.
-    JOIN A WAIT_FOR_THREAD
+    INC I   
 
-    STO A 514           ; Adres 9: Succes! Sla het geoogste thread-resultaat op op 501
-    HALT                ; Adres 10: Hoofd-CPU stopt.
+    JOIN B SPAWN_LOOP
+    ADD X B
 
-    ; ==========================================================
-    ;  THREAD CONTEXT CODE (Begint exact op PC = 11)
-    ; ==========================================================
-THREAD_START:
-    LDI B 5             ; Adres 11: R2 (B) = 5
-    MUL A B             ; Adres 12: R1 (A) = A + B = 55 + 5 = 60
-    CLOSE               ; Adres 13: Thread is klaar, uCore in A blijft VALID!
+    JMP SPAWN_LOOP      
+
+MATRIX_FULL_HANDLER:
+    ; Oogst in register B in plaats van A! Hierdoor blijft Master-register A intact.
+    JOIN B MATRIX_FULL_HANDLER 
+    
+    ADD X B             ; Tel het resultaat uit B op bij het totaal X
+
+    JMP SPAWN_LOOP
+
+; ==========================================================
+;  FINALE FLUSH
+; ==========================================================
+FLUSH_REMAINING:
+    ; Oogst ook hier in register B!
+    JOIN B ALL_DONE     
+
+    ADD X B
+    JMP FLUSH_REMAINING
+
+ALL_DONE:
+
+    SYNC FLUSH_REMAINING
+
+    STO X 512           ; Sla het eindresultaat op op adres 512
+    HALT                
+
+; ==========================================================
+;  PARALLELLE WORKER THREAD CODE
+; ==========================================================
+THREAD_WORKER: 
+    LDI M 42
+    LDI L 42
+    MUL M L
+
+    LDI B 1             
+    MUL B A  
+
+    RETURN B
+    ;CLOSE
 }
 """
 
 
 
-parser = Lark(grammar, parser='lalr')
-parse_tree = parser.parse(source_code)
-expander = MacroExpander()
-schone_assembly = expander.transform(parse_tree)
+# parser = Lark(grammar, parser='lalr')
+# parse_tree = parser.parse(source_code)
+# expander = MacroExpander()
+# schone_assembly = expander.transform(parse_tree)
 
-print("--- Output ---")
-print(schone_assembly)
+# print("--- Output ---") 
+# print(schone_assembly)
+
+# print(assemble(schone_assembly))
+
+
+
