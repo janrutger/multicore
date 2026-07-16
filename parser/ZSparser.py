@@ -2,230 +2,6 @@ from lark import Lark, Transformer
 from grammer import grammar
 from assemblerV3 import assemble
 
-# class MacroExpander(Transformer):
-#     def __init__(self):
-#         super().__init__()
-#         self.macro_table = {}
-#         # Nieuw: een tabel om constanten, IO-poorten en RES-labels in op te slaan
-#         self.symbol_table = {}
-
-#     # --- NIEUW: Vang de MAP directives op en sla de waarden op ---
-#     def io_stmt(self, items):
-#         name = str(items[0])
-#         value = int(items[1]) # Direct naar int voor berekeningen
-#         self.symbol_table[name] = {"type": "IO", "value": value}
-#         return None
-
-#     def const_stmt(self, items):
-#         name = str(items[0])
-#         value = int(items[1])
-#         self.symbol_table[name] = {"type": "CONST", "value": value}
-#         return None
-
-#     def res_stmt(self, items):
-#         name = str(items[0])
-#         value = int(items[1]) # Aantal gereserveerde bytes/woorden
-#         self.symbol_table[name] = {"type": "RES", "value": value}
-#         return None
-
-#     def start_stmt(self, items):
-#         return None
-
-#     def macro_def(self, items):
-#         macro_name = str(items[0])
-#         remaining = items[1:]
-        
-#         if remaining and isinstance(remaining[0], list):
-#             params = remaining[0]
-#             instructions = remaining[1:]
-#         else:
-#             params = []
-#             instructions = remaining
-
-#         clean_instructions = [str(instr) for instr in instructions if instr]
-
-#         self.macro_table[macro_name] = {
-#             "params": params,
-#             "body": clean_instructions
-#         }
-#         return None
-
-#     def param_list(self, items):
-#         return [str(i) for i in items]
-
-#     def instruction(self, items):
-#         mnemonic = str(items[0])
-#         args = [str(item) for item in items[1:] if item is not None]
-        
-#         if args:
-#             return f"{mnemonic} {', '.join(args)}"
-#         return f"{mnemonic}"
-
-#     def label_def(self, items):
-#         return f"{items[0]}:"
-
-#     def macro_call(self, items):
-#         macro_name = str(items[0])
-#         args = items[1] if len(items) > 1 else []
-
-#         if macro_name not in self.macro_table:
-#             raise NameError(f"Fout: Macro '{macro_name}' is niet gedefinieerd!")
-
-#         macro = self.macro_table[macro_name]
-        
-#         if len(args) != len(macro["params"]):
-#             raise ValueError(f"Fout: {macro_name} verwacht {len(macro['params'])} args, kreeg {len(args)}.")
-
-#         param_map = dict(zip(macro["params"], args))
-#         expanded_lines = [f"; --- Start macro: {macro_name} ---"]
-
-#         for instr in macro["body"]:
-#             tokens = instr.replace(',', ' ').split()
-#             if not tokens:
-#                 continue
-#             mnemonic = tokens[0]
-#             replaced_args = [param_map.get(tok, tok) for tok in tokens[1:]]
-            
-#             if replaced_args:
-#                 expanded_lines.append(f"    {mnemonic} {', '.join(replaced_args)}")
-#             else:
-#                 expanded_lines.append(f"    {mnemonic}")
-            
-#         expanded_lines.append(f"; --- Einde macro: {macro_name} ---")
-#         return "\n".join(expanded_lines)
-
-#     def arg_list(self, items):
-#         return [str(i) for i in items]
-
-#     def map_block(self, items):
-#         # We hoeven het MAP-blok zelf niet terug te zien in de pure assembly output
-#         return None
-
-#     def program_block(self, items):
-#         lines = [str(item) for item in items if item and str(item) != 'None']
-#         return "\n".join(lines)
-
-#     def start(self, items):
-#         program_code = items[1]
-        
-#         # --- DE FINALE PAS: Vervang alle bekende constanten/IO-labels door hun waarde ---
-#         for symbol, info in self.symbol_table.items():
-#             actual_value = str(info["value"])
-            
-#             import re
-#             program_code = re.sub(rf'\b{symbol}\b', actual_value, program_code)
-            
-#         return program_code
-            
-
-# # --- TEST MET JOUW INPUT ---
-# # source_code = """
-# # MAP {
-# #     START   main
-# #     IO      X_value   2
-    
-# #     MACRO SET_AND_OUT(reg, waarde, poort) {
-# #         LDI reg, waarde
-# #         OUT reg, poort
-# #     }
-# # }
-
-# # PROGRAM {
-# #     main:
-# #         SET_AND_OUT(A, 10, X_value)
-# #         LDI A 10
-# #         HALT
-# # }
-# # """
-
-# source_code = """
-# MAP {
-#     START   main
-#     IO      X_value   2
-#     MACRO SET_AND_OUT(reg, waarde, poort) {
-#         LDI reg, waarde
-#         OUT reg, poort
-#     }
-# }
-
-# PROGRAM {
-# ; ==========================================================
-# ;  15x CONTEXT STRESSTEST (Gecorrigeerd)
-# ; ==========================================================
-#     LDI A 5             ; Bronwaarde voor de threads (blijft ALTIJD 1)
-#     LDI I 0             ; Lus-teller I = 0
-#     LDI Y 150            ; De doelwaarde (15 iteraties)
-#     LDI X 0             ; Totaalteller X = 0
-
-# SPAWN_LOOP:
-#     TSTE I Y            
-#     JMPT FLUSH_REMAINING 
-
-#     CONTEXT A THREAD_WORKER 
-#     FAIL MATRIX_FULL_HANDLER  
-
-#     INC I   
-
-#     JOIN B SPAWN_LOOP
-#     ADD X B
-
-#     JMP SPAWN_LOOP      
-
-# MATRIX_FULL_HANDLER:
-#     ; Oogst in register B in plaats van A! Hierdoor blijft Master-register A intact.
-#     JOIN B MATRIX_FULL_HANDLER 
-    
-#     ADD X B             ; Tel het resultaat uit B op bij het totaal X
-
-#     JMP SPAWN_LOOP
-
-# ; ==========================================================
-# ;  FINALE FLUSH
-# ; ==========================================================
-# FLUSH_REMAINING:
-#     ; Oogst ook hier in register B!
-#     JOIN B ALL_DONE     
-
-#     ADD X B
-#     JMP FLUSH_REMAINING
-
-# ALL_DONE:
-
-#     SYNC FLUSH_REMAINING
-
-#     STO X 512           ; Sla het eindresultaat op op adres 512
-#     HALT                
-
-# ; ==========================================================
-# ;  PARALLELLE WORKER THREAD CODE
-# ; ==========================================================
-# THREAD_WORKER: 
-#     LDI M 42
-#     LDI L 42
-#     MUL M L
-
-#     LDI B 1             
-#     MUL B A  
-
-#     RETURN B
-#     ;CLOSE
-# }
-# """
-
-
-
-# # parser = Lark(grammar, parser='lalr')
-# # parse_tree = parser.parse(source_code)
-# # expander = MacroExpander()
-# # schone_assembly = expander.transform(parse_tree)
-
-# # print("--- Output ---") 
-# # print(schone_assembly)
-
-# # print(assemble(schone_assembly))
-
-
-
 class MacroExpander(Transformer):
     def __init__(self):
         super().__init__()
@@ -239,10 +15,12 @@ class MacroExpander(Transformer):
         # We berekenen de start van de data-allocatie zodra we MEMSIZE en SP weten.
         self.allocator_initialized = False
         self.next_free_address = None
+        self.start_label = None
+        self.loop_counter = 0  # Voor unieke lus-labels
 
     def _initialize_allocator(self):
         if not self.allocator_initialized:
-            # De stackpointer start op memsize - 1 (bijv. 1023)[cite: 17]
+            # De stackpointer start op memsize - 1 (bijv. 1023)
             # De stack zelf heeft een omvang van self.sp_size
             # Het eerste veilige adres voor variabelen (RES) ligt direct daaronder:
             self.next_free_address = (self.memsize - 1) - self.sp_size
@@ -298,13 +76,19 @@ class MacroExpander(Transformer):
         # Vervang alle bekende symbolen door hun berekende waarde
         for symbol, info in self.symbol_table.items():
             actual_value = str(info["value"])
-            
             import re
             program_code = re.sub(rf'\b{symbol}\b', actual_value, program_code)
+            
+        # NIEUW: Als er een START directive is gedefinieerd, zetten we een JMP op adres 0
+        if self.start_label:
+            bootstrap = f"; --- BOOTSTRAP VECTOR ---\n    JMP {self.start_label}\n; ------------------------\n"
+            program_code = bootstrap + program_code
             
         return program_code
 
     def start_stmt(self, items):
+        # Sla het label op (bijvoorbeeld 'main')
+        self.start_label = str(items[0]).upper()
         return None
 
     def macro_def(self, items):
@@ -334,11 +118,11 @@ class MacroExpander(Transformer):
         args = [str(item) for item in items[1:] if item is not None]
         
         if args:
-            return f"{mnemonic} {', '.join(args)}"
-        return f"{mnemonic}"
+            return f"    {mnemonic} {', '.join(args)}"
+        return f"    {mnemonic}"
 
     def label_def(self, items):
-        return f"{items[0]}:"
+        return f"\n{items[0]}:"
 
     def macro_call(self, items):
         macro_name = str(items[0])
@@ -369,6 +153,303 @@ class MacroExpander(Transformer):
             
         expanded_lines.append(f"; --- Einde macro: {macro_name} ---")
         return "\n".join(expanded_lines)
+    
+    # --- DE REPEAT GENERATOR ---
+
+    # def repeat_tail(self, items):
+    #     # We kijken naar het aantal argumenten om te bepalen welke variant we hebben
+    #     if len(items) == 2:
+    #         # Variant: REGISTER "TIMES" (INT | IDENTIFIER)
+    #         return {
+    #             "mode": "TIMES",
+    #             "reg": str(items[0]),
+    #             "count": str(items[1])
+    #         }
+    #     elif len(items) == 3:
+    #         # Variant: "UNTIL" "(" argument COMPARATOR argument ")"
+    #         return {
+    #             "mode": "UNTIL",
+    #             "arg1": str(items[0]),
+    #             "op": str(items[1]),
+    #             "arg2": str(items[2])
+    #         }
+    #     elif len(items) == 5:
+    #         # Variant: REGISTER "TIMES" (INT | IDENTIFIER) "UNTIL" ...
+    #         return {
+    #             "mode": "BOTH",
+    #             "reg": str(items[0]),
+    #             "count": str(items[1]),
+    #             "arg1": str(items[2]),
+    #             "op": str(items[3]),
+    #             "arg2": str(items[4])
+    #         }
+    #     return None
+
+    # def repeat_stmt(self, items):
+    #     # Alle items behalve de laatste zijn de regels in de body van de REPEAT loop
+    #     body_lines = [str(line) for line in items[:-1] if line]
+    #     tail = items[-1]  # Het resultaat van repeat_tail
+
+    #     # Genereer unieke labels voor deze specifieke lus
+    #     start_label = f"__REP_START_{self.loop_counter}"
+    #     end_label = f"__REP_END_{self.loop_counter}"
+    #     self.loop_counter += 1
+
+    #     assembly = []
+
+    #     # === 1. INITIALISATIE (Voorafgaand aan de lus) ===
+    #     if tail["mode"] in ["TIMES", "BOTH"]:
+    #         # Laad de teller in het door de programmeur gekozen register
+    #         assembly.append(f"    LDI {tail['reg']}, {tail['count']}")
+
+    #     # === 2. DE LUS IN ===
+    #     assembly.append(f"; --- REPEAT LOOP START ---")
+    #     assembly.append(f"{start_label}:")
+
+    #     # Voeg de body-instructies van de gebruiker toe
+    #     for line in body_lines:
+    #         assembly.append(line)
+
+    #     # === 3. EVALUATIE (Aan het einde van de lus) ===
+    #     if tail["mode"] == "UNTIL":
+    #         # Evalueer conditie. Indien WAAR (True), breek af (dus spring NIET terug).
+    #         # Indien ONWAAR (False), spring terug naar start.
+    #         if tail["op"] == "==":
+    #             assembly.append(f"    TSTE {tail['arg1']}, {tail['arg2']}")
+    #         elif tail["op"] == ">":
+    #             assembly.append(f"    TSTG {tail['arg1']}, {tail['arg2']}")
+            
+    #         assembly.append(f"    JMPF {start_label}")
+
+    #     elif tail["mode"] == "TIMES":
+    #         # Verminder de teller en spring terug zolang deze groter is dan 0
+    #         assembly.append(f"    DEC {tail['reg']}")
+    #         assembly.append(f"    TSTG {tail['reg']}, 0")
+    #         assembly.append(f"    JMPT {start_label}")
+
+    #     elif tail["mode"] == "BOTH":
+    #         # Gecombineerde variant: "doe N keer, TENZIJ conditie waar is"
+    #         # Eerst testen we de UNTIL conditie. Als die WAAR is -> spring direct naar het einde.
+    #         if tail["op"] == "==":
+    #             assembly.append(f"    TSTE {tail['arg1']}, {tail['arg2']}")
+    #         elif tail["op"] == ">":
+    #             assembly.append(f"    TSTG {tail['arg1']}, {tail['arg2']}")
+            
+    #         assembly.append(f"    JMPT {end_label}")  # Ontsnap uit de lus!
+
+    #         # Daarna de TIMES teller checken
+    #         assembly.append(f"    DEC {tail['reg']}")
+    #         assembly.append(f"    TSTG {tail['reg']}, 0")
+    #         assembly.append(f"    JMPT {start_label}")
+
+    #     # === 4. HET EINDE ===
+    #     if tail["mode"] == "BOTH":
+    #         assembly.append(f"{end_label}:")
+        
+    #     assembly.append(f"; --- REPEAT LOOP END ---")
+
+    #     return "\n".join(assembly)
+    # def repeat_stmt(self, items):
+    #     # Filter de tail (de dictionary) en de body_lines (de strings) eruit
+    #     tail = None
+    #     body_lines = []
+        
+    #     for item in items:
+    #         if isinstance(item, dict):
+    #             tail = item
+    #         elif isinstance(item, str) and item != "REPEAT":
+    #             body_lines.append(item)
+
+    #     if not tail:
+    #         raise ValueError("Fout: Geen geldige REPEAT conditie gevonden!")
+
+    #     # Genereer unieke labels voor deze specifieke lus
+    #     start_label = f"__REP_START_{self.loop_counter}"
+    #     end_label = f"__REP_END_{self.loop_counter}"
+    #     self.loop_counter += 1
+
+    #     assembly = []
+
+    #     # === 1. INITIALISATIE (Voorafgaand aan de lus) ===
+    #     if tail["mode"] in ["TIMES", "BOTH"]:
+    #         # Laad de teller in het door de programmeur gekozen register
+    #         assembly.append(f"    LDI {tail['reg']}, {tail['count']}")
+
+    #     # === 2. DE LUS IN ===
+    #     assembly.append(f"; --- REPEAT LOOP START ---")
+    #     assembly.append(f"{start_label}:")
+
+    #     # Voeg de body-instructies van de gebruiker toe
+    #     for line in body_lines:
+    #         assembly.append(line)
+
+    #     # === 3. EVALUATIE (Aan het einde van de lus) ===
+    #     if tail["mode"] == "UNTIL":
+    #         # Evalueer conditie. Indien WAAR (True), breek af (dus spring NIET terug).
+    #         # Indien ONWAAR (False), spring terug naar start.
+    #         if tail["op"] == "==":
+    #             assembly.append(f"    TSTE {tail['arg1']}, {tail['arg2']}")
+    #         elif tail["op"] == ">":
+    #             assembly.append(f"    TSTG {tail['arg1']}, {tail['arg2']}")
+            
+    #         assembly.append(f"    JMPF {start_label}")
+
+    #     elif tail["mode"] == "TIMES":
+    #         # Verminder de teller en spring terug zolang deze groter is dan 0
+    #         assembly.append(f"    DEC {tail['reg']}")
+    #         assembly.append(f"    TSTG {tail['reg']}, 0")
+    #         assembly.append(f"    JMPT {start_label}")
+
+    #     elif tail["mode"] == "BOTH":
+    #         # Gecombineerde variant: "doe N keer, TENZIJ conditie waar is"
+    #         # Eerst testen we de UNTIL conditie. Als die WAAR is -> spring direct naar het einde.
+    #         if tail["op"] == "==":
+    #             assembly.append(f"    TSTE {tail['arg1']}, {tail['arg2']}")
+    #         elif tail["op"] == ">":
+    #             assembly.append(f"    TSTG {tail['arg1']}, {tail['arg2']}")
+            
+    #         assembly.append(f"    JMPT {end_label}")  # Ontsnap uit de lus!
+
+    #         # Daarna de TIMES teller checken
+    #         assembly.append(f"    DEC {tail['reg']}")
+    #         assembly.append(f"    TSTG {tail['reg']}, 0")
+    #         assembly.append(f"    JMPT {start_label}")
+
+    #     # === 4. HET EINDE ===
+    #     if tail["mode"] == "BOTH":
+    #         assembly.append(f"{end_label}:")
+        
+    #     assembly.append(f"; --- REPEAT LOOP END ---")
+
+    #     return "\n".join(assembly)
+    
+    def repeat_tail(self, items):
+        # Filter haakjes of andere onnodige leestekens direct weg
+        clean_items = [str(x) for x in items if str(x) not in ("(", ")")]
+        
+        # We kijken naar de resterende nuttige argumenten:
+        if len(clean_items) == 3:
+            # Variant: REGISTER TIMES_KEYWORD (INT | IDENTIFIER)
+            # Voorbeeld: ['I', 'TIMES', '5']
+            return {
+                "mode": "TIMES",
+                "reg": clean_items[0],
+                "count": clean_items[2]
+            }
+        elif len(clean_items) == 4:
+            # Variant: UNTIL_KEYWORD argument COMPARATOR argument
+            # Voorbeeld: ['UNTIL', 'A', '==', '10']
+            return {
+                "mode": "UNTIL",
+                "arg1": clean_items[1],
+                "op": clean_items[2],
+                "arg2": clean_items[3]
+            }
+        elif len(clean_items) == 7:
+            # Variant: REGISTER TIMES_KEYWORD (INT | IDENTIFIER) UNTIL_KEYWORD argument COMPARATOR argument
+            # Voorbeeld: ['K', 'TIMES', '10', 'UNTIL', 'B', '==', '1']
+            return {
+                "mode": "BOTH",
+                "reg": clean_items[0],
+                "count": clean_items[2],
+                "arg1": clean_items[4],
+                "op": clean_items[5],
+                "arg2": clean_items[6]
+            }
+        
+        # Mocht de lengte afwijken, geef de rauwe lijst terug voor de fallback-handler
+        return {"error": True, "raw_items": clean_items}
+
+    def repeat_stmt(self, items):
+        tail = None
+        body_lines = []
+        
+        for item in items:
+            # Als het item de getransformeerde dict van repeat_tail is
+            if isinstance(item, dict) and "mode" in item:
+                tail = item
+            # Soms geeft Lark de getransformeerde node door als een Tree-object
+            elif hasattr(item, 'data') and item.data == 'repeat_tail':
+                tail = self.repeat_tail(item.children)
+            elif isinstance(item, str):
+                if item != "REPEAT":
+                    body_lines.append(item)
+            elif isinstance(item, list):
+                body_lines.extend([str(x) for x in item if x])
+            else:
+                # Fallback voor overige Lark elementen/tokens
+                val_str = str(item)
+                if val_str.strip() and val_str != "REPEAT":
+                    body_lines.append(val_str)
+
+        # WATERDICHTE DEBUGGER:
+        if not tail or "error" in tail:
+            print("\n[DEBUG ERROR] REPEAT detectie mislukt!")
+            print(f"Binnengekomen items in repeat_stmt (aantal: {len(items)}):")
+            for idx, it in enumerate(items):
+                if hasattr(it, 'data'):
+                    print(f"  [{idx}] Lark Tree Node: data={it.data}, children={it.children}")
+                else:
+                    print(f"  [{idx}] Type={type(it)}, Waarde={repr(it)}")
+            raise ValueError("Fout: Geen geldige REPEAT conditie gevonden!")
+
+        # Genereer unieke labels voor deze specifieke lus
+        start_label = f"__REP_START_{self.loop_counter}"
+        end_label = f"__REP_END_{self.loop_counter}"
+        self.loop_counter += 1
+
+        assembly = []
+
+        # === 1. INITIALISATIE (Voorafgaand aan de lus) ===
+        if tail["mode"] in ["TIMES", "BOTH"]:
+            assembly.append(f"    LDI {tail['reg']}, {tail['count']}")
+
+        # === 2. DE LUS IN ===
+        assembly.append(f"; --- REPEAT LOOP START ---")
+        assembly.append(f"{start_label}:")
+
+        # Voeg de body-instructies toe
+        for line in body_lines:
+            assembly.append(line)
+
+        # === 3. EVALUATIE (Aan het einde van de lus) ===
+        if tail["mode"] == "UNTIL":
+            if tail["op"] == "==":
+                assembly.append(f"    TSTE {tail['arg1']}, {tail['arg2']}")
+            elif tail["op"] == ">":
+                assembly.append(f"    TSTG {tail['arg1']}, {tail['arg2']}")
+            assembly.append(f"    JMPF {start_label}")
+
+        elif tail["mode"] == "TIMES":
+            # Verminder de teller met 1 (bijv. DEC I)
+            assembly.append(f"    DEC {tail['reg']}")
+            # Test direct of de teller 0 is geworden (TSTZ I)
+            assembly.append(f"    TSTZ {tail['reg']}")
+            # Indien NIET nul (False), spring terug naar het begin
+            assembly.append(f"    JMPF {start_label}")
+
+        elif tail["mode"] == "BOTH":
+            # Eerst de UNTIL ontsnapping testen
+            if tail["op"] == "==":
+                assembly.append(f"    TSTE {tail['arg1']}, {tail['arg2']}")
+            elif tail["op"] == ">":
+                assembly.append(f"    TSTG {tail['arg1']}, {tail['arg2']}")
+            assembly.append(f"    JMPT {end_label}")
+
+            # Daarna de teller decrementeren en testen
+            assembly.append(f"    DEC {tail['reg']}")
+            assembly.append(f"    TSTZ {tail['reg']}")
+            # Indien nog niet 0 (False), herhaal de lus
+            assembly.append(f"    JMPF {start_label}")
+
+        # === 4. HET EINDE ===
+        if tail["mode"] == "BOTH":
+            assembly.append(f"{end_label}:")
+        
+        assembly.append(f"; --- REPEAT LOOP END ---")
+
+        return "\n".join(assembly)
+    
 
     def arg_list(self, items):
         return [str(i) for i in items]
@@ -377,5 +458,12 @@ class MacroExpander(Transformer):
         return None
 
     def program_block(self, items):
+        # We filteren lege regels eruit en voegen ze samen
         lines = [str(item) for item in items if item and str(item) != 'None']
-        return "\n".join(lines)
+        
+        # Schoonheidsreparatie: we zorgen dat dubbele witregels (door labels) 
+        # netjes worden gereduceerd tot één schone witregel.
+        raw_code = "\n".join(lines)
+        import re
+        clean_code = re.sub(r'\n{3,}', '\n\n', raw_code)
+        return clean_code

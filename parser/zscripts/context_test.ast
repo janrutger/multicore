@@ -51,6 +51,7 @@ start
         reg
         poort
   program_block
+    label_def	main
     macro_call
       INIT
       arg_list

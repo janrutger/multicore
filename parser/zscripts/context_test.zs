@@ -7,15 +7,15 @@ MAP {
    
 
     CONST bron 5
-    CONST itter 15
+    CONST itter 100
 
     IO      X_value   2
 
     MACRO INIT(arg1, arg2) {
         LDI A arg1             ; Bronwaarde voor de threads 
-        LDI I 0             ; Lus-teller I = 0
-        LDI Y arg2            ; De doelwaarde (15 iteraties)
-        LDI X 0             ; Totaalteller X = 0
+        LDI I 0                ; Lus-teller I = 0
+        LDI Y arg2             ; De doelwaarde (15 iteraties)
+        LDI X 0                ; Totaalteller X = 0
     }
 
     MACRO SET_AND_OUT(reg, waarde, poort) {
@@ -25,6 +25,7 @@ MAP {
 }
 
 PROGRAM {
+main:
 ; ==========================================================
 ;  15x CONTEXT STRESSTEST (Gecorrigeerd)
 ; ==========================================================

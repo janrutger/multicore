@@ -278,6 +278,30 @@ def _execute_cycleZ32(master_cpu, target):
             target.last_active_core = core_id
             target.last_test_core = core_id  # Lokaal vastleggen voor target sprongen
 
+        elif opcode == Op.TSTG:
+            if not master_cpu.free_cores: return # Stall
+            core_id = master_cpu.free_cores.popleft()
+            
+            src1_core = target.registers[reg1]
+            src2_core = target.registers[arg2]
+            
+            master_cpu.cores[core_id].dispatch('cmpgt', arg1=src1_core, arg2=src2_core)
+
+            target.registers[reg1] = core_id
+            target.last_active_core = core_id
+            target.last_test_core = core_id  # Lokaal vastleggen voor target sprongen
+
+        elif opcode == Op.TSTZ:
+            if not master_cpu.free_cores: return # Stall
+            core_id = master_cpu.free_cores.popleft()
+
+            src1_core = target.registers[reg1]
+
+            master_cpu.cores[core_id].dispatch('tstz', arg1=src1_core, arg2=None)
+            target.registers[reg1] = core_id
+            target.last_active_core = core_id
+            target.last_test_core = core_id  # Lokaal vastleggen voor target sprongen
+
 
         # ==========================================
         #   SYSTEM / FLOW CONTROL

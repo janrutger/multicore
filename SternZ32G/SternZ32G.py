@@ -1,48 +1,5 @@
-# # SternZ32G.py
-# import tkinter as tk
-# import time
-# from InmosZ32G import CPU
-# from opcodes import context_stress, display_test, encrypt_program
-# from assemblerV2 import assemble
-# from frontpanelZ32G import FrontPanel
-# from IOcontroller import IOController  # Importeer de nieuwe IO-chip!
-
-
-# class SternZ32Mainboard:
-#     def __init__(self):
-#         print("--- INITIALISEER STERN-Z32 PLATFORM (EVENT-DRIVEN) ---")
-        
-#         # 1. Start de Master GUI Root die het ritme en de venster-contexts bepaalt
-#         self.root = tk.Tk()
-#         self.root.title("STERN-Z32 Mainboard Central Clock")
-#         self.root.configure(bg="#1e1e1e")
-        
-#         # 2. Initialiseer de CPU hardware matrix (32 cores + context switches)
-#         self.cpu = CPU()
-#         self.show_log = True
-        
-#         # 3. UPGRADE: Soldeer de IOController op het mainboard chipset-vlak
-#         # We geven de master root mee zodat de schermen en toetsenbord-bindings direct werken
-#         self.io_controller = IOController(self.root)
-
-#         # Koppel de IO-controller ook direct aan de CPU, zodat OUT/IN/IOSYNC hardware-instructies
-#         # direct via de interne bus met self.io_controller kunnen praten.
-#         self.cpu.IO(self.io_controller)           # Solder jumper when the right CPU is installed
-        
-#         # 4. Koppel en bed (embed) het Frontpanel in deze root
-#         self.panel = FrontPanel(self.root, num_cores=32)
-        
-#         # 5. Vertaal het testprogramma via de assembler en laad het in het geheugen
-#         test_program = assemble(context_stress)  
-#         print(f"Gegenereerde machinecode: {test_program}\n")
-        
-#         for adres, machine_woord in enumerate(test_program):
-#             self.cpu.memory.memWrite(machine_woord, adres)
-            
-#         # Systeemtellers & Performance Tuning
-#         self.totale_ticks = 0
-#         self.cycles_per_frame = 50  # Aantal CPU-ticks dat we per GUI-yield wegtikken
 # SternZ32G.py
+
 import tkinter as tk
 import time
 import sys

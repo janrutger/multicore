@@ -56,7 +56,7 @@ class Op(IntEnum):
     MUL   = 60      # Implemented
     MOD   = 65      # Implemented
     TSTE  = 71      # Implemented
-    TSTG  = 72
+    TSTG  = 72      # Implemented
 
     XOR    = 42     # Implemented
     
@@ -68,12 +68,13 @@ class Op(IntEnum):
     # CALLS = 95
     INC   = 80     # Implemented
     DEC   = 81     # Implemented
-    RETURN= 19    # Implemented
+    RETURN= 19     # Implemented
+    TSTZ  = 73     # Implemented
 
 # Vaste sets voor de decoder om snel het format te matchen
 FORMAT_ZERO        = {Op.NOP, Op.HALT, Op.CLOSE, Op.IOSYNC}
 FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.SUCCES, Op.FAIL, Op.SYNC}
-FORMAT_ONE_REG     = {Op.INC, Op.DEC, Op.RETURN}
+FORMAT_ONE_REG     = {Op.INC, Op.DEC, Op.RETURN, Op.TSTZ}
 FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.TSTE, Op.TSTG, Op.XOR}
 FORMAT_TWO_REG_VAL = {
     Op.LDI, Op.LDM, Op.LDX, Op.OUT, Op.IN, Op.STO, Op.STX, 
