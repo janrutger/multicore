@@ -68,6 +68,7 @@ ALL_DONE:
     SYNC FLUSH_REMAINING
 
     STO X adres           ; Sla het eindresultaat op op adres 512
+
     HALT                
 
 ; ==========================================================

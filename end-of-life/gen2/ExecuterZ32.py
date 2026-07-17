@@ -445,7 +445,7 @@ def _execute_cycleZ32(master_cpu, target):
 
         elif opcode == Op.RETURN:
             if target == master_cpu:
-                raise RuntimeError("Hardware Fault: De master-CPU mag CLOSE niet aanroepen!")
+                raise RuntimeError("Hardware Fault: De master-CPU mag RETURN niet aanroepen!")
             
             # We lopen door de registers van de context en contoleren of alles IDLE (context is echt klaar) is
             for reg_val in target.registers.values():

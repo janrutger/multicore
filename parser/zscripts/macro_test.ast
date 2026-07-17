@@ -1,0 +1,40 @@
+start
+  map_block
+    memsize_stmt	1024
+    sp_stmt	10
+    start_stmt	main
+    macro_def
+      WAITING
+      param_list
+        REG
+        CONSTANT
+      instruction
+        LDI
+        REG
+        CONSTANT
+      label_def	LUS
+      instruction
+        DEC
+        REG
+      instruction
+        TSTG
+        REG
+        0
+      instruction
+        JMPT
+        LUS
+  program_block
+    label_def	main
+    macro_call
+      WAITING
+      arg_list
+        A
+        10
+    macro_call
+      WAITING
+      arg_list
+        B
+        20
+    instruction
+      HALT
+      None

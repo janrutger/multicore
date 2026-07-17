@@ -3,15 +3,15 @@
 ; ------------------------
 
 main:
-; --- Start macro: INIT ---
+; --- Start hygiënische macro: INIT (ID: 1) ---
     LDI A, 5
     LDI I, 0
-    LDI Y, 15
+    LDI Y, 100
     LDI X, 0
 ; --- Einde macro: INIT ---
 
 SPAWN_LOOP:
-    TSTE I, Yd
+    TSTE I, Y
     JMPT FLUSH_REMAINING
     CONTEXT A, THREAD_WORKER
     FAIL MATRIX_FULL_HANDLER

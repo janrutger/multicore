@@ -368,11 +368,17 @@ def _execute_cycleZ32(master_cpu, target):
             target.fsm_state = 'FETCH'
 
         elif opcode == Op.SUCCES:
+            if target != master_cpu:
+                raise RuntimeError("Hardware Fault: Een sub-context mag geen SUCCES/FAIL uitvoeren!")
+            
             if master_cpu.status == 1:
                 master_cpu.PC = arg2
             master_cpu.fsm_state = 'FETCH'
 
         elif opcode == Op.FAIL:
+            if target != master_cpu:
+                raise RuntimeError("Hardware Fault: Een sub-context mag geen SUCCES/FAIL uitvoeren!")
+            
             if master_cpu.status == 0:
                 master_cpu.PC = arg2
                 master_cpu.status = 1

@@ -12,6 +12,7 @@ __REP_START_0:
     TSTZ I
     JMPF __REP_START_0
 ; --- REPEAT LOOP END ---
+    STO A, 1007
     LDI K, 10
 ; --- REPEAT LOOP START ---
 __REP_START_1:
@@ -20,6 +21,7 @@ __REP_START_1:
     JMPF __REP_START_1
 ; --- REPEAT LOOP END ---
     TSTG A, K
+    STO A, 1006
     LDI B, 0
     LDI K, 1
     LDI K, 10
@@ -34,5 +36,5 @@ __REP_START_2:
     JMPF __REP_START_2
 __REP_END_2:
 ; --- REPEAT LOOP END ---
-    STO A, 1007
+    STO A, 1005
     HALT
