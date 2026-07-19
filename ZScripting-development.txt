@@ -19,3 +19,22 @@ Rx -> [adres]       STO Rx adres
 
 Rx -> [adres + Ry]  LD I Ry; STX Rx adres
 [adres + Ry] -> Rx  LD I Ryl LDX Rx adres
+
+
+STATUS: GEIMPLEMENEERT
+
+
+
+IF statement uitbreiding
+
+DOEL:
+    eenvoudiger voor de progammeur, die zonder TSTx en JMPx kan werken
+    IF (condition) FALSE {logic} TRUE {logic}
+
+VOORBEELDEN:
+    IF (A == B) TRUE  {Logic}
+    IF (A  > B) FALSE {logic}
+    IF (A == B) TRUE  {logic} FALSE {logic}
+
+
+

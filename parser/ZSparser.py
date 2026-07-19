@@ -125,62 +125,6 @@ class MacroExpander(Transformer):
     def label_def(self, items):
         return f"\n{items[0]}:"
 
-    # def macro_call(self, items):
-    #     macro_name = str(items[0])
-    #     args = items[1] if len(items) > 1 else []
-
-    #     if macro_name not in self.macro_table:
-    #         raise NameError(f"Fout: Macro '{macro_name}' is niet gedefinieerd!")
-
-    #     macro = self.macro_table[macro_name]
-        
-    #     if len(args) != len(macro["params"]):
-    #         raise ValueError(f"Fout: {macro_name} verwacht {len(macro['params'])} args, kreeg {len(args)}.")
-
-    #     # Verhoog de unieke macro-aanroep ID om clashes te voorkomen
-    #     self.macro_call_counter += 1
-    #     unique_id = self.macro_call_counter
-
-    #     param_map = dict(zip(macro["params"], args))
-    #     expanded_lines = [f"; --- Start hygiënische macro: {macro_name} (ID: {unique_id}) ---"]
-
-    #     for instr in macro["body"]:
-    #         # Zorg dat we labels binnen de macro herkennen en uniek maken!
-    #         # Labels eindigen vaak op een dubbele punt (bijv. 'LUS:')
-    #         stripped_instr = instr.strip()
-    #         if stripped_instr.endswith(':'):
-    #             local_label = stripped_instr[:-1]
-    #             # Maak het label uniek door de macro-call ID eraan te plakken
-    #             hygienic_label = f"__M{unique_id}_{local_label}"
-    #             expanded_lines.append(f"{hygienic_label}:")
-    #             continue
-
-    #         # Vervang tokens en parameters
-    #         tokens = instr.replace(',', ' ').split()
-    #         if not tokens:
-    #             continue
-            
-    #         mnemonic = tokens[0]
-    #         replaced_args = []
-            
-    #         for tok in tokens[1:]:
-    #             # 1. Is het een parameter van de macro?
-    #             if tok in param_map:
-    #                 replaced_args.append(param_map[tok])
-    #             # 2. Is het een verwijzing naar een lokaal label?
-    #             # Als de macro springt naar 'LUS', dan mappen we dat naar '__M{id}_LUS'
-    #             elif tok in [b.strip().replace(':', '') for b in macro["body"] if b.strip().endswith(':')]:
-    #                 replaced_args.append(f"__M{unique_id}_{tok}")
-    #             else:
-    #                 replaced_args.append(tok)
-            
-    #         if replaced_args:
-    #             expanded_lines.append(f"    {mnemonic} {', '.join(replaced_args)}")
-    #         else:
-    #             expanded_lines.append(f"    {mnemonic}")
-            
-    #     expanded_lines.append(f"; --- Einde macro: {macro_name} ---")
-    #     return "\n".join(expanded_lines)
     
     def macro_call(self, items):
         macro_name = str(items[0])
@@ -390,69 +334,7 @@ class MacroExpander(Transformer):
             return f"[{items[0]} + {items[1]}]"
         return f"[{' '.join(str(x) for x in items)}]"
 
-    # # === GECORRIGEERDE ASSIGNMENT HANDLER ===
-    # def assignment(self, items):
-    #     """
-    #     Verwerkt de versimpelde ZScript dataflow syntax met correcte hardware-mapping.
-    #     Formaat: van -> naar
-    #     """
-    #     # items[0] en items[1] zijn nu gegarandeerd nette strings dankzij de mem_ref handler
-    #     source = str(items[0]).strip()
-    #     target = str(items[1]).strip()
-    #     asm_output = []
 
-    #     def parse_memory_operand(operand):
-    #         if operand.startswith('[') and operand.endswith(']'):
-    #             inner = operand[1:-1].strip()
-    #             if '+' in inner:
-    #                 parts = inner.split('+')
-    #                 base = parts[0].strip()
-    #                 idx = parts[1].strip()
-    #                 return {"type": "INDEXED", "base": base, "index": idx}
-    #             else:
-    #                 return {"type": "DIRECT", "address": inner}
-    #         return {"type": "REGISTER_OR_VAL", "value": operand}
-
-    #     src_parsed = parse_memory_operand(source)
-    #     tgt_parsed = parse_memory_operand(target)
-
-    #     # --- CASE 1: [adres + Ry] -> Rx (Geïndexeerd Geheugen Lezen) ---
-    #     if src_parsed["type"] == "INDEXED" and tgt_parsed["type"] == "REGISTER_OR_VAL":
-    #         dest_reg = tgt_parsed["value"]
-    #         base_address = src_parsed["base"]
-    #         index_reg = src_parsed["index"]
-
-    #         if index_reg != 'I':
-    #             asm_output.append(f"    LD I, {index_reg}")
-    #         asm_output.append(f"    LDX {dest_reg}, {base_address}")
-
-    #     # --- CASE 2: Rx -> [adres + Ry] (Geïndexeerd Geheugen Schrijven) ---
-    #     elif src_parsed["type"] == "REGISTER_OR_VAL" and tgt_parsed["type"] == "INDEXED":
-    #         src_reg = src_parsed["value"]
-    #         base_address = tgt_parsed["base"]
-    #         index_reg = tgt_parsed["index"]
-
-    #         if index_reg != 'I':
-    #             asm_output.append(f"    LD I, {index_reg}")
-    #         asm_output.append(f"    STX {src_reg}, {base_address}")
-
-    #     # --- CASE 3: [adres] -> Rx (Direct Geheugen Lezen) ---
-    #     elif src_parsed["type"] == "DIRECT" and tgt_parsed["type"] == "REGISTER_OR_VAL":
-    #         asm_output.append(f"    LDM {tgt_parsed['value']}, {src_parsed['address']}")
-
-    #     # --- CASE 4: Rx -> [adres] (Direct Geheugen Schrijven) ---
-    #     elif src_parsed["type"] == "REGISTER_OR_VAL" and tgt_parsed["type"] == "DIRECT":
-    #         asm_output.append(f"    STO {src_parsed['value']}, {tgt_parsed['address']}")
-
-    #     # --- CASE 5: Waarde/Register -> Rx (Immediate laden of Register Transfer) ---
-    #     elif src_parsed["type"] == "REGISTER_OR_VAL" and tgt_parsed["type"] == "REGISTER_OR_VAL":
-    #         val = src_parsed["value"]
-    #         if val.isdigit() or val.startswith('-'):
-    #             asm_output.append(f"    LDI {tgt_parsed['value']}, {val}")
-    #         else:
-    #             asm_output.append(f"    LD {tgt_parsed['value']}, {val}")
-
-    #     return "\n".join(asm_output)
     # === GECORRIGEERDE ASSIGNMENT HANDLER ===
     def assignment(self, items):
         """
@@ -525,16 +407,131 @@ class MacroExpander(Transformer):
 
         return "\n".join(asm_output)
 
-    # # === OPTIONELE EXTRA VEILIGHEID IN INSTRUCTION ===
-    # DUBBEL 
-    # def instruction(self, items):
-    #     mnemonic = str(items[0])
-    #     # Zorg dat eventuele overgebleven objecten netjes platgeslagen worden naar strings
-    #     args = [str(item) for item in items[1:] if item is not None]
+    # PARALLEL statement block
+    def parallel_stmt(self, items):
+        """
+        Genereert een hygiënische hardware-parallel loop met een Greedy JOIN voor de Z32 matrix.
+        Werkt non-blocking via de asynchrone CONTEXT/JOIN architectuur.
+        """
+        # SCHOONMAAKFILTER: Eet alle syntactische ruis, haakjes en keywords op
+        clean_items = [
+            str(x) for x in items 
+            if str(x) not in ("(", ")", "{", "}", "PARALLEL", "USING", "UNTIL", "->")
+        ]
+
+        # Controleer of we exact de 7 bouwstenen overhouden
+        if len(clean_items) < 7:
+            raise ValueError(f"[ZScript Error] PARALLEL syntaffout. Verwachtte 7 argumenten, kreeg: {clean_items}")
+
+        worker_name = clean_items[0] # XOR_WORKER
+        src_mem     = clean_items[1] # [INbuffer + X]
+        rz_reg      = clean_items[2] # A
+        comparator  = clean_items[3] # == of >
+        rq_val      = clean_items[4] # B
+        dest_reg    = clean_items[5] # A
+        dest_mem    = clean_items[6] # [ENCODEbuffer + Y]
+
+        # Helper om basisadres en index-register te splitsen
+        def parse_memory_operand(operand):
+            inner = operand.strip("[] ")
+            if '+' in inner:
+                parts = inner.split('+')
+                return parts[0].strip(), parts[1].strip()
+            return inner, None
+
+        src_base, src_idx   = parse_memory_operand(src_mem)
+        dest_base, dest_idx = parse_memory_operand(dest_mem)
+
+        pipe_id = self.loop_counter
+        self.loop_counter += 1
+
+        # Unieke labels voor deze parallelle pijplijn
+        lbl_loop    = f"__PIPE_{pipe_id}_LOOP"
+        lbl_harvest = f"__PIPE_{pipe_id}_HARVEST"
+        lbl_drain   = f"__PIPE_{pipe_id}_DRAIN"
+        lbl_collect = f"__PIPE_{pipe_id}_COLLECT"
+        lbl_done    = f"__PIPE_{pipe_id}_DONE"
+
+        asm = [f"\n; --- START GEGENEREERDE HARDWARE PARALLEL (Worker: {worker_name}, ID: {pipe_id}) ---"]
+
+        # --- 1. HOOFDLUS: Laad data in Rz via het index-register ---
+        asm.append(f"{lbl_loop}:")
+        if src_idx:
+            if src_idx != 'I':
+                asm.append(f"    LD I, {src_idx}")
+            asm.append(f"    LDX {rz_reg}, {src_base}")
+        else:
+            asm.append(f"    LDM {rz_reg}, {src_base}")
+
+        # Evalueer direct de UNTIL stop-conditie
+        if comparator == "==":
+            asm.append(f"    TSTE {rz_reg}, {rq_val}")
+        elif comparator == ">":
+            asm.append(f"    TSTG {rz_reg}, {rq_val}")
+        asm.append(f"    JMPT {lbl_drain}")
+
+        # --- 2. CONTEXT SPAWN (Inclusief Z32 matrix-vol check) ---
+        asm.append(f"    CONTEXT {rz_reg}, {worker_name}") 
+        asm.append(f"    FAIL {lbl_harvest}")  # Matrix vol (< 10 cores)? Spring naar verplicht oogsten.
         
-    #     if args:
-    #         return f"    {mnemonic} {', '.join(args)}"
-    #     return f"    {mnemonic}"
+        # Incrementeer de bron-pointer (asynchroon, mag direct tijdens het rekenen)
+        if src_idx:
+            asm.append(f"    INC {src_idx}")
+
+        # === GREEDY JOIN INTERVALLUM ===
+        # Probeer direct de oudste actieve thread te oogsten (non-blocking)
+        asm.append(f"    JOIN {dest_reg}, {lbl_loop}")
+        
+        # Oogst gelukt (Fallthrough): Schrijf direct weg naar de ENCODEbuffer via dest_idx
+        if dest_idx:
+            if dest_idx != 'I':
+                asm.append(f"    LD I, {dest_idx}")
+            asm.append(f"    STX {dest_reg}, {dest_base}")
+            asm.append(f"    INC {dest_idx}")
+        else:
+            asm.append(f"    STO {dest_reg}, {dest_base}")
+        asm.append(f"    JMP {lbl_loop}")
+
+        # --- 3. VERPLICHT OOGSTEN (Bij matrix-verzadiging) ---
+        asm.append(f"{lbl_harvest}:")
+        asm.append(f"    JOIN {dest_reg}, {lbl_harvest}") 
+        if dest_idx:
+            if dest_idx != 'I':
+                asm.append(f"    LD I, {dest_idx}")
+            asm.append(f"    STX {dest_reg}, {dest_base}")
+            asm.append(f"    INC {dest_idx}")
+        else:
+            asm.append(f"    STO {dest_reg}, {dest_base}")
+        asm.append(f"    JMP {lbl_loop}")
+
+        # --- 4. LEEGDRAAI-FASE (Invoer is uitgeput, wachten op lopende cores) ---
+        asm.append(f"{lbl_drain}:")
+        asm.append(f"    SYNC {lbl_collect}")
+        asm.append(f"    JMP {lbl_done}")
+
+        asm.append(f"{lbl_collect}:")
+        asm.append(f"    JOIN {dest_reg}, {lbl_collect}")
+        if dest_idx:
+            if dest_idx != 'I':
+                asm.append(f"    LD I, {dest_idx}")
+            asm.append(f"    STX {dest_reg}, {dest_base}")
+            asm.append(f"    INC {dest_idx}")
+        else:
+            asm.append(f"    STO {dest_reg}, {dest_base}")
+        asm.append(f"    JMP {lbl_drain}")
+
+        # --- 5. AFSLUITING (Sluit de buffer netjes af met de stop-waarde) ---
+        asm.append(f"{lbl_done}:")
+        if dest_idx:
+            if dest_idx != 'I':
+                asm.append(f"    LD I, {dest_idx}")
+            asm.append(f"    STX {rq_val}, {dest_base}")
+            asm.append(f"    INC {dest_idx}")
+        else:
+            asm.append(f"    STO {rq_val}, {dest_base}")
+
+        asm.append(f"; --- EINDE GEGENEREERDE HARDWARE PARALLEL ---\n")
+        return "\n".join(asm)
 
     def arg_list(self, items):
         return [str(i) for i in items]

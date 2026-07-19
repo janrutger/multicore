@@ -67,24 +67,24 @@ main:
         FAIL oogst
         INC X 
 
-        JOIN A LOOP
-        A -> [ENCODEbuffer + Y]
+        JOIN C LOOP             ; Gready JOIN
+        C -> [ENCODEbuffer + Y]
         INC Y
 
         JMP LOOP
 
 
     oogst:
-        JOIN A oogst
-        A -> [ENCODEbuffer + Y]
+        JOIN C oogst
+        C -> [ENCODEbuffer + Y]
         INC Y
 
         JMP LOOP
 
 
     oogst_laatsten:
-        JOIN A klaar
-        A -> [ENCODEbuffer + Y]
+        JOIN C klaar
+        C -> [ENCODEbuffer + Y]
         INC Y
         JMP oogst_laatsten
 
@@ -99,8 +99,10 @@ end_program:
 
 XOR_WORKER:
     masterkey -> K
+    LDI C 0
 
     XOR A K
+    LD C A
 
     CLOSE
     ; RETURN A
