@@ -21,7 +21,23 @@ param_list: IDENTIFIER ("," IDENTIFIER)*
 program_block: "PROGRAM" "{" (_NL | program_line)* "}"
 
 // Een echte regel is nu ofwel een label, of een instructie/macro/repeat die eindigt met een newline
-?program_line: label_def _NL? | (instruction | macro_call | repeat_stmt) _NL
+// Voeg 'assignment' toe aan de geldige regels:
+?program_line: label_def _NL? | (instruction | assignment | macro_call | repeat_stmt) _NL
+
+
+
+// De toewijzingsregel
+assignment: assign_source "->" assign_target
+
+// Definieer wat links en rechts mag staan
+?assign_source: REGISTER | INT | IDENTIFIER | mem_ref
+?assign_target: REGISTER | mem_ref
+
+// Geheugen-referenties: [adres], [512], [adres + Ry], of [512 + Ry]
+mem_ref: "[" (IDENTIFIER | INT) "]"
+       | "[" (IDENTIFIER | INT) "+" REGISTER "]"
+
+
 
 // --- REPEAT DEFINITIES ---
 repeat_stmt: REPEAT_KEYWORD repeat_tail _NL? "{" (_NL | program_line)* "}"

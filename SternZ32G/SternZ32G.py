@@ -185,8 +185,8 @@ class SternZ32Mainboard:
         print("             GEHEUGEN DUMP (Adres 1023 - 23)              ")
         print("==========================================================")
         
-        start_adres = 1024 - 23
-        aantal_adressen = 24
+        start_adres = 1024 - 50
+        aantal_adressen = 50
         
         for i in range(aantal_adressen):
             current_addr = start_adres + i

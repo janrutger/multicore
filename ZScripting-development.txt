@@ -1,0 +1,21 @@
+Uitbreiding van de ZScripting syntax
+
+DOEL:
+    Alternatief voor het gebruik van LD, LDI, LDM, LDX, STO en STX instructie
+    Zodat het eenvoudiger wordt voor de programmeur
+
+
+Opmerkingen:
+    - Omdat iedere context een eigen registerfile heeft, is dit CONTEXT save.
+    - Het I register us unsave omdat de compiler deze intern gebruikt
+
+
+VOORBEELDEN:
+
+Rx -> Ry            LD  Ry Rx
+42 -> Rx            LDI Rx 42
+Rx -> [adres]       STO Rx adres 
+[adres] -> Rx       LDM Rx adres
+
+Rx -> [adres + Ry]  LD I Ry; STX Rx adres
+[adres + Ry] -> Rx  LD I Ryl LDX Rx adres
