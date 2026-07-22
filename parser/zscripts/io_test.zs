@@ -67,7 +67,7 @@ main:
         FAIL oogst
         INC X 
 
-        JOIN C LOOP             ; Gready JOIN
+        JOIN C LOOP             ; Gready JOIN, EARLY harvest
         C -> [ENCODEbuffer + Y]
         INC Y
 

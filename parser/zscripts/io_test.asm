@@ -69,4 +69,6 @@ end_program:
 XOR_WORKER:
     LDI K, 13
     XOR A, K
+    MUL K A
+    MUL K A
     CLOSE

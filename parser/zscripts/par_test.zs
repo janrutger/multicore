@@ -54,6 +54,7 @@ main:
 
 end_program:
     HALT
+    
 
 XOR_WORKER:
     LDI K, 7

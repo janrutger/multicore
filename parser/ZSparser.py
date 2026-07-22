@@ -126,6 +126,72 @@ class MacroExpander(Transformer):
         return f"\n{items[0]}:"
 
     
+    # def macro_call(self, items):
+    #     macro_name = str(items[0])
+    #     args = items[1] if len(items) > 1 else []
+
+    #     if macro_name not in self.macro_table:
+    #         raise NameError(f"Fout: Macro '{macro_name}' is niet gedefinieerd!")
+
+    #     macro = self.macro_table[macro_name]
+        
+    #     if len(args) != len(macro["params"]):
+    #         raise ValueError(f"Fout: {macro_name} verwacht {len(macro['params'])} args, kreeg {len(args)}.")
+
+    #     self.macro_call_counter += 1
+    #     unique_id = self.macro_call_counter
+
+    #     param_map = dict(zip(macro["params"], args))
+    #     expanded_lines = [f"; --- Start hygiënische macro: {macro_name} (ID: {unique_id}) ---"]
+
+    #     for instr in macro["body"]:
+    #         stripped_instr = instr.strip()
+    #         if stripped_instr.endswith(':'):
+    #             local_label = stripped_instr[:-1]
+    #             hygienic_label = f"__M{unique_id}_{local_label}"
+    #             expanded_lines.append(f"{hygienic_label}:")
+    #             continue
+
+    #         # Vervang tokens en parameters
+    #         tokens = instr.replace(',', ' ').split()
+    #         if not tokens:
+    #             continue
+            
+    #         mnemonic = tokens[0]
+    #         replaced_args = []
+            
+    #         for tok in tokens[1:]:
+    #             if tok in param_map:
+    #                 replaced_args.append(param_map[tok])
+    #             elif tok in [b.strip().replace(':', '') for b in macro["body"] if b.strip().endswith(':')]:
+    #                 replaced_args.append(f"__M{unique_id}_{tok}")
+    #             else:
+    #                 replaced_args.append(tok)
+            
+    #         # === AUTOMATISCHE TYPE-CORRECTIE VÓÓR EMISSIE (FIXED) ===
+    #         if mnemonic == "LD" and len(replaced_args) == 2:
+    #             source_val = replaced_args[1]
+                
+    #             # Check of het direct een getal is
+    #             is_immediate = source_val.isdigit() or source_val.startswith('-')
+                
+    #             # FIX: Check of het een symbool is dat resolvet naar een getal (CONST / IO / RES)
+    #             if not is_immediate and source_val in self.symbol_table:
+    #                 resolved_value = str(self.symbol_table[source_val]["value"])
+    #                 if resolved_value.isdigit() or resolved_value.startswith('-'):
+    #                     is_immediate = True
+                        
+    #             if is_immediate:
+    #                 mnemonic = "LDI"
+
+    #         if replaced_args:
+    #             expanded_lines.append(f"    {mnemonic} {', '.join(replaced_args)}")
+    #         else:
+    #             expanded_lines.append(f"    {mnemonic}")
+            
+    #     expanded_lines.append(f"; --- Einde macro: {macro_name} ---")
+    #     return "\n".join(expanded_lines)
+
     def macro_call(self, items):
         macro_name = str(items[0])
         args = items[1] if len(items) > 1 else []
@@ -144,8 +210,22 @@ class MacroExpander(Transformer):
         param_map = dict(zip(macro["params"], args))
         expanded_lines = [f"; --- Start hygiënische macro: {macro_name} (ID: {unique_id}) ---"]
 
-        for instr in macro["body"]:
+        # Splits de body op regeleinden voor het geval er getransformeerde blokken (zoals REPEAT) in zitten
+        raw_body_lines = []
+        for raw_item in macro["body"]:
+            for sub_line in str(raw_item).splitlines():
+                if sub_line.strip():
+                    raw_body_lines.append(sub_line)
+
+        for instr in raw_body_lines:
             stripped_instr = instr.strip()
+            
+            # 1. Bewaar commentaren EN automatisch gegenereerde REPEAT/PIPE labels intact!
+            if stripped_instr.startswith(';') or stripped_instr.startswith('__REP') or stripped_instr.startswith('__PIPE'):
+                expanded_lines.append(f"    {stripped_instr}" if not stripped_instr.endswith(':') else f"{stripped_instr}")
+                continue
+
+            # 2. Lokale macro-labels prefixen met __M<id>_
             if stripped_instr.endswith(':'):
                 local_label = stripped_instr[:-1]
                 hygienic_label = f"__M{unique_id}_{local_label}"
@@ -163,19 +243,16 @@ class MacroExpander(Transformer):
             for tok in tokens[1:]:
                 if tok in param_map:
                     replaced_args.append(param_map[tok])
-                elif tok in [b.strip().replace(':', '') for b in macro["body"] if b.strip().endswith(':')]:
+                elif tok in [b.strip().replace(':', '') for b in raw_body_lines if b.strip().endswith(':') and not b.strip().startswith('__REP')]:
                     replaced_args.append(f"__M{unique_id}_{tok}")
                 else:
                     replaced_args.append(tok)
             
-            # === AUTOMATISCHE TYPE-CORRECTIE VÓÓR EMISSIE (FIXED) ===
+            # === AUTOMATISCHE TYPE-CORRECTIE VÓÓR EMISSIE ===
             if mnemonic == "LD" and len(replaced_args) == 2:
                 source_val = replaced_args[1]
-                
-                # Check of het direct een getal is
                 is_immediate = source_val.isdigit() or source_val.startswith('-')
                 
-                # FIX: Check of het een symbool is dat resolvet naar een getal (CONST / IO / RES)
                 if not is_immediate and source_val in self.symbol_table:
                     resolved_value = str(self.symbol_table[source_val]["value"])
                     if resolved_value.isdigit() or resolved_value.startswith('-'):
@@ -191,7 +268,7 @@ class MacroExpander(Transformer):
             
         expanded_lines.append(f"; --- Einde macro: {macro_name} ---")
         return "\n".join(expanded_lines)
-    
+
     # --- DE REPEAT GENERATOR ---
 
     
@@ -232,59 +309,141 @@ class MacroExpander(Transformer):
         # Mocht de lengte afwijken, geef de rauwe lijst terug voor de fallback-handler
         return {"error": True, "raw_items": clean_items}
 
+    # def repeat_stmt(self, items):
+    #     tail = None
+    #     body_lines = []
+        
+    #     for item in items:
+    #         # Als het item de getransformeerde dict van repeat_tail is
+    #         if isinstance(item, dict) and "mode" in item:
+    #             tail = item
+    #         # Soms geeft Lark de getransformeerde node door als een Tree-object
+    #         elif hasattr(item, 'data') and item.data == 'repeat_tail':
+    #             tail = self.repeat_tail(item.children)
+    #         elif isinstance(item, str):
+    #             if item != "REPEAT":
+    #                 body_lines.append(item)
+    #         elif isinstance(item, list):
+    #             body_lines.extend([str(x) for x in item if x])
+    #         else:
+    #             # Fallback voor overige Lark elementen/tokens
+    #             val_str = str(item)
+    #             if val_str.strip() and val_str != "REPEAT":
+    #                 body_lines.append(val_str)
+
+    #     # WATERDICHTE DEBUGGER:
+    #     if not tail or "error" in tail:
+    #         print("\n[DEBUG ERROR] REPEAT detectie mislukt!")
+    #         print(f"Binnengekomen items in repeat_stmt (aantal: {len(items)}):")
+    #         for idx, it in enumerate(items):
+    #             if hasattr(it, 'data'):
+    #                 print(f"  [{idx}] Lark Tree Node: data={it.data}, children={it.children}")
+    #             else:
+    #                 print(f"  [{idx}] Type={type(it)}, Waarde={repr(it)}")
+    #         raise ValueError("Fout: Geen geldige REPEAT conditie gevonden!")
+
+    #     # Genereer unieke labels voor deze specifieke lus
+    #     start_label = f"__REP_START_{self.loop_counter}"
+    #     end_label = f"__REP_END_{self.loop_counter}"
+    #     self.loop_counter += 1
+
+    #     assembly = []
+
+    #     # === 1. INITIALISATIE (Voorafgaand aan de lus) ===
+    #     if tail["mode"] in ["TIMES", "BOTH"]:
+    #         assembly.append(f"    LDI {tail['reg']}, {tail['count']}")
+
+    #     # === 2. DE LUS IN ===
+    #     assembly.append(f"; --- REPEAT LOOP START ---")
+    #     assembly.append(f"{start_label}:")
+
+    #     # Voeg de body-instructies toe
+    #     for line in body_lines:
+    #         assembly.append(line)
+
+    #     # === 3. EVALUATIE (Aan het einde van de lus) ===
+    #     if tail["mode"] == "UNTIL":
+    #         if tail["op"] == "==":
+    #             assembly.append(f"    TSTE {tail['arg1']}, {tail['arg2']}")
+    #         elif tail["op"] == ">":
+    #             assembly.append(f"    TSTG {tail['arg1']}, {tail['arg2']}")
+    #         assembly.append(f"    JMPF {start_label}")
+
+    #     elif tail["mode"] == "TIMES":
+    #         # Verminder de teller met 1 (bijv. DEC I)
+    #         assembly.append(f"    DEC {tail['reg']}")
+    #         # Test direct of de teller 0 is geworden (TSTZ I)
+    #         assembly.append(f"    TSTZ {tail['reg']}")
+    #         # Indien NIET nul (False), spring terug naar het begin
+    #         assembly.append(f"    JMPF {start_label}")
+
+    #     elif tail["mode"] == "BOTH":
+    #         # Eerst de UNTIL ontsnapping testen
+    #         if tail["op"] == "==":
+    #             assembly.append(f"    TSTE {tail['arg1']}, {tail['arg2']}")
+    #         elif tail["op"] == ">":
+    #             assembly.append(f"    TSTG {tail['arg1']}, {tail['arg2']}")
+    #         assembly.append(f"    JMPT {end_label}")
+
+    #         # Daarna de teller decrementeren en testen
+    #         assembly.append(f"    DEC {tail['reg']}")
+    #         assembly.append(f"    TSTZ {tail['reg']}")
+    #         # Indien nog niet 0 (False), herhaal de lus
+    #         assembly.append(f"    JMPF {start_label}")
+
+    #     # === 4. HET EINDE ===
+    #     if tail["mode"] == "BOTH":
+    #         assembly.append(f"{end_label}:")
+        
+    #     assembly.append(f"; --- REPEAT LOOP END ---")
+
+    #     return "\n".join(assembly)
     def repeat_stmt(self, items):
         tail = None
         body_lines = []
         
         for item in items:
-            # Als het item de getransformeerde dict van repeat_tail is
             if isinstance(item, dict) and "mode" in item:
                 tail = item
-            # Soms geeft Lark de getransformeerde node door als een Tree-object
             elif hasattr(item, 'data') and item.data == 'repeat_tail':
                 tail = self.repeat_tail(item.children)
             elif isinstance(item, str):
                 if item != "REPEAT":
-                    body_lines.append(item)
+                    # Als de string meerdere regels bevat, splitsen we ze
+                    body_lines.extend([line.strip() for line in item.splitlines() if line.strip()])
             elif isinstance(item, list):
-                body_lines.extend([str(x) for x in item if x])
+                for x in item:
+                    if x:
+                        body_lines.extend([line.strip() for line in str(x).splitlines() if line.strip()])
             else:
-                # Fallback voor overige Lark elementen/tokens
                 val_str = str(item)
                 if val_str.strip() and val_str != "REPEAT":
-                    body_lines.append(val_str)
+                    body_lines.extend([line.strip() for line in val_str.splitlines() if line.strip()])
 
-        # WATERDICHTE DEBUGGER:
         if not tail or "error" in tail:
-            print("\n[DEBUG ERROR] REPEAT detectie mislukt!")
-            print(f"Binnengekomen items in repeat_stmt (aantal: {len(items)}):")
-            for idx, it in enumerate(items):
-                if hasattr(it, 'data'):
-                    print(f"  [{idx}] Lark Tree Node: data={it.data}, children={it.children}")
-                else:
-                    print(f"  [{idx}] Type={type(it)}, Waarde={repr(it)}")
             raise ValueError("Fout: Geen geldige REPEAT conditie gevonden!")
 
-        # Genereer unieke labels voor deze specifieke lus
         start_label = f"__REP_START_{self.loop_counter}"
         end_label = f"__REP_END_{self.loop_counter}"
         self.loop_counter += 1
 
         assembly = []
 
-        # === 1. INITIALISATIE (Voorafgaand aan de lus) ===
+        # 1. INITIALISATIE
         if tail["mode"] in ["TIMES", "BOTH"]:
             assembly.append(f"    LDI {tail['reg']}, {tail['count']}")
 
-        # === 2. DE LUS IN ===
+        # 2. DE LUS IN
         assembly.append(f"; --- REPEAT LOOP START ---")
         assembly.append(f"{start_label}:")
 
-        # Voeg de body-instructies toe
         for line in body_lines:
-            assembly.append(line)
+            if not line.startswith(";") and not line.endswith(":") and not line.startswith("    "):
+                assembly.append(f"    {line}")
+            else:
+                assembly.append(line)
 
-        # === 3. EVALUATIE (Aan het einde van de lus) ===
+        # 3. EVALUATIE
         if tail["mode"] == "UNTIL":
             if tail["op"] == "==":
                 assembly.append(f"    TSTE {tail['arg1']}, {tail['arg2']}")
@@ -293,28 +452,21 @@ class MacroExpander(Transformer):
             assembly.append(f"    JMPF {start_label}")
 
         elif tail["mode"] == "TIMES":
-            # Verminder de teller met 1 (bijv. DEC I)
             assembly.append(f"    DEC {tail['reg']}")
-            # Test direct of de teller 0 is geworden (TSTZ I)
             assembly.append(f"    TSTZ {tail['reg']}")
-            # Indien NIET nul (False), spring terug naar het begin
             assembly.append(f"    JMPF {start_label}")
 
         elif tail["mode"] == "BOTH":
-            # Eerst de UNTIL ontsnapping testen
             if tail["op"] == "==":
                 assembly.append(f"    TSTE {tail['arg1']}, {tail['arg2']}")
             elif tail["op"] == ">":
                 assembly.append(f"    TSTG {tail['arg1']}, {tail['arg2']}")
             assembly.append(f"    JMPT {end_label}")
 
-            # Daarna de teller decrementeren en testen
             assembly.append(f"    DEC {tail['reg']}")
             assembly.append(f"    TSTZ {tail['reg']}")
-            # Indien nog niet 0 (False), herhaal de lus
             assembly.append(f"    JMPF {start_label}")
 
-        # === 4. HET EINDE ===
         if tail["mode"] == "BOTH":
             assembly.append(f"{end_label}:")
         
