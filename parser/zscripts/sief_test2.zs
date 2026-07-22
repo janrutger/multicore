@@ -17,7 +17,8 @@ MAP {
 PROGRAM {
     MAIN:
         fill_list(list_base, list_len)
-        LDI B, list_len
+        ; LDI B, list_len
+        list_len -> B
         INC B
         LDI I, 0              ; Start-index voor het spawnen
 
@@ -28,10 +29,10 @@ PROGRAM {
         ; Probeer een uCore te alloceren en start SIEF met de huidige index I als context
         CONTEXT I, SIEF
         FAIL HARVEST_ONE      ; Matrix vol (< 10 cores vrij)? Spring naar tijdelijk oogsten
-        
-
         ; Spawn is gelukt, ga naar de volgende index
         INC I
+
+        JOIN A SPAWN_LOOP       ; eerst een gready/early harvest
         JMP SPAWN_LOOP
 
     HARVEST_ONE:
@@ -46,10 +47,7 @@ PROGRAM {
         JOIN A DRAIN_LOOP
         ; SYNC DONE_LABEL
         ; JMP DRAIN_LOOP
-        SYNC DRAIN_LOOP
-
-
-
+        SYNC DRAIN_LOOP         ; Spring naar drain_loop als er nog 'waiting'contexten zijn
 
     DONE_LABEL:
         HALT
@@ -59,39 +57,51 @@ PROGRAM {
     ;  DE SIEF WORKER (Met decentrale schrijf-operatie)
     ; ==========================================================
     SIEF:
-        LDI K, 0
-        LDI B, 1
-        LDI C, 0
+        ; LDI K, 0
+        ; LDI B, 1
+        1 -> B
+        ; LDI C, 0
+        0 -> C
         
         ; Register I bevat de unieke, lokale thread-index voor deze uCore
-        LDX A, list_base      ; A = getal dat we gaan testen op prime
+        ; LDX A, list_base      ; A = getal dat we gaan testen op prime
+        [list_base + I] -> A
 
         TSTZ A 
         JMPT store_no_prime
 
-        LDI B, 1
+        ; LDI B, 1
+        1 -> B 
         TSTE A, B
         JMPT store_no_prime
 
-        LDI B, 2
-        TSTE A, B
-        JMPT store_prime
-        LDI B, 3
+        ; LDI B, 2
+        INC B 
         TSTE A, B
         JMPT store_prime
 
-        LDI B, 2
+        ; LDI B, 3
+        INC B
+        TSTE A, B
+        JMPT store_prime
+
+        ; LDI B, 2
+        2 -> B
 
     PRIME_LOOP:
-        LDI K, 0
-        ADD K, B
-        MUL K, B
+        ; LDI K, 0
+        ; ADD K, B
+        ; MUL K, B
+        B -> C
+        MUL C B
         
-        TSTG K, A
+        ; TSTG K, A
+        TSTG C A
         JMPT store_prime
 
-        LDI C, 0
-        ADD C, A
+        ; LDI C, 0
+        ; ADD C, A
+        A -> C
         MOD C, B
 
         TSTZ C
@@ -102,13 +112,16 @@ PROGRAM {
 
     store_prime:
         ; Schrijf de priemwaarde (A) direct terug naar list_base + I (lokale index)
-        STX A, list_base
+        ; STX A, list_base
+        A -> [list_base + I]
         JMP end_sief
 
     store_no_prime:
         ; Schrijf 0 terug naar list_base + I (lokale index)
-        LDI A, 0
-        STX A, list_base
+        ; LDI A, 0
+        ; STX A, list_base
+        0 -> A 
+        A -> [list_base + I]
         JMP end_sief
 
     end_sief:
