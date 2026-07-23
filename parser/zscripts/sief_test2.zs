@@ -17,22 +17,20 @@ MAP {
 PROGRAM {
     MAIN:
         fill_list(list_base, list_len)
-        ; LDI B, list_len
         list_len -> B
         INC B
-        LDI I, 0              ; Start-index voor het spawnen
+        0 -> I             ; Start-index voor het spawnen
 
     SPAWN_LOOP:
-        TSTE I, B             ; Hebben we alle 90 threads geprobeerd te starten?
+        TSTE I, B             ; Hebben we alle threads geprobeerd te starten?
         JMPT DRAIN_LOOP       ; Ja -> ga naar de afbouwfase
 
-        ; Probeer een uCore te alloceren en start SIEF met de huidige index I als context
-        CONTEXT I, SIEF
+        ; Probeer een uCore te alloceren en start SIEVE met de huidige index I als context
+        CONTEXT I, SIEVE
         FAIL HARVEST_ONE      ; Matrix vol (< 10 cores vrij)? Spring naar tijdelijk oogsten
-        ; Spawn is gelukt, ga naar de volgende index
-        INC I
+        INC I                 ; Spawn is gelukt, ga naar de volgende index
 
-        JOIN A SPAWN_LOOP       ; eerst een gready/early harvest
+        JOIN A SPAWN_LOOP     ; eerst een gready/early harvest
         JMP SPAWN_LOOP
 
     HARVEST_ONE:
@@ -45,22 +43,17 @@ PROGRAM {
     DRAIN_LOOP:
         ; Alle 90 threads zijn gespawned. We wachten nu tot de allerlaatste core klaar is.
         JOIN A DRAIN_LOOP
-        ; SYNC DONE_LABEL
-        ; JMP DRAIN_LOOP
-        SYNC DRAIN_LOOP         ; Spring naar drain_loop als er nog 'waiting'contexten zijn
+        SYNC DRAIN_LOOP       ; Spring naar drain_loop als er nog 'waiting'contexten zijn
 
     DONE_LABEL:
         HALT
 
 
     ; ==========================================================
-    ;  DE SIEF WORKER (Met decentrale schrijf-operatie)
+    ;  DE SIEVE WORKER (Met decentrale schrijf-operatie)
     ; ==========================================================
-    SIEF:
-        ; LDI K, 0
-        ; LDI B, 1
+    SIEVE:
         1 -> B
-        ; LDI C, 0
         0 -> C
         
         ; Register I bevat de unieke, lokale thread-index voor deze uCore
@@ -70,37 +63,27 @@ PROGRAM {
         TSTZ A 
         JMPT store_no_prime
 
-        ; LDI B, 1
         1 -> B 
         TSTE A, B
         JMPT store_no_prime
 
-        ; LDI B, 2
-        INC B 
+        INC B                   ; B = 2
         TSTE A, B
         JMPT store_prime
 
-        ; LDI B, 3
-        INC B
+        INC B                   ; B = 3
         TSTE A, B
         JMPT store_prime
 
-        ; LDI B, 2
         2 -> B
 
     PRIME_LOOP:
-        ; LDI K, 0
-        ; ADD K, B
-        ; MUL K, B
         B -> C
         MUL C B
         
-        ; TSTG K, A
         TSTG C A
         JMPT store_prime
 
-        ; LDI C, 0
-        ; ADD C, A
         A -> C
         MOD C, B
 
@@ -112,14 +95,11 @@ PROGRAM {
 
     store_prime:
         ; Schrijf de priemwaarde (A) direct terug naar list_base + I (lokale index)
-        ; STX A, list_base
         A -> [list_base + I]
         JMP end_sief
 
     store_no_prime:
         ; Schrijf 0 terug naar list_base + I (lokale index)
-        ; LDI A, 0
-        ; STX A, list_base
         0 -> A 
         A -> [list_base + I]
         JMP end_sief
