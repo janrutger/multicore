@@ -449,31 +449,31 @@ def _execute_cycleZ32(master_cpu, target):
             target.fsm_state = 'DONE'
             return
 
-        elif opcode == Op.RETURN:
-            if target == master_cpu:
-                raise RuntimeError("Hardware Fault: De master-CPU mag CLOSE niet aanroepen!")
+        # elif opcode == Op.RETURN:
+        #     if target == master_cpu:
+        #         raise RuntimeError("Hardware Fault: De master-CPU mag CLOSE niet aanroepen!")
             
-            # We lopen door de registers van de context en contoleren of alles IDLE (context is echt klaar) is
-            for reg_val in target.registers.values():
-                if reg_val is not None:  # Dit is een Core-ID wijzer naar ons (eind)resultaat
-                    assigned_core = master_cpu.cores[reg_val]
-                    if assigned_core.coreStatus == 'WORKING':
-                        # De keten is nog niet klaar! Dwing de thread om te wachten.
-                        target.fsm_state = 'EXECUTE'
-                        return 
-            # Pas als álle cores in de registers van de thread de status 'VALID' hebben,
-            # is de berekening gegarandeerd voltooid en kan de Master veilig JOINEN.
-            target.fsm_state = 'DONE'
+        #     # We lopen door de registers van de context en contoleren of alles IDLE (context is echt klaar) is
+        #     for reg_val in target.registers.values():
+        #         if reg_val is not None:  # Dit is een Core-ID wijzer naar ons (eind)resultaat
+        #             assigned_core = master_cpu.cores[reg_val]
+        #             if assigned_core.coreStatus == 'WORKING':
+        #                 # De keten is nog niet klaar! Dwing de thread om te wachten.
+        #                 target.fsm_state = 'EXECUTE'
+        #                 return 
+        #     # Pas als álle cores in de registers van de thread de status 'VALID' hebben,
+        #     # is de berekening gegarandeerd voltooid en kan de Master veilig JOINEN.
+        #     target.fsm_state = 'DONE'
 
 
-            # SCHOONMAAKWERK: Zet alle overige uCores van deze thread-context op IDLE
-            for reg_idx, core_id in target.registers.items():
-                if core_id is not None:
-                    if reg_idx == reg1:
-                        continue
-                    master_cpu.cores[core_id].coreStatus = 'IDLE'
+        #     # SCHOONMAAKWERK: Zet alle overige uCores van deze thread-context op IDLE
+        #     for reg_idx, core_id in target.registers.items():
+        #         if core_id is not None:
+        #             if reg_idx == reg1:
+        #                 continue
+        #             master_cpu.cores[core_id].coreStatus = 'IDLE'
 
-            return
+        #     return
             
 
 

@@ -70,6 +70,7 @@ PROGRAM {
         INC B                   ; B = 2
         TSTE A, B
         JMPT store_prime
+        
 
         INC B                   ; B = 3
         TSTE A, B
