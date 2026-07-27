@@ -406,132 +406,115 @@ class MacroExpander(Transformer):
 
         return "\n".join(asm_output)
 
-    # PARALLEL statement block
-    # def parallel_stmt(self, items):
-    #     """
-    #     Genereert een hygiënische hardware-parallel loop met een Greedy JOIN voor de Z32 matrix.
-    #     Werkt non-blocking via de asynchrone CONTEXT/JOIN architectuur.
-    #     """
-    #     # SCHOONMAAKFILTER: Eet alle syntactische ruis, haakjes en keywords op
-    #     clean_items = [
-    #         str(x) for x in items 
-    #         if str(x) not in ("(", ")", "{", "}", "PARALLEL", "USING", "UNTIL", "->")
-    #     ]
+    def if_condition(self, items):
+        """
+        Zet de conditie-node uit de grammatica om naar een schoon dictionary object.
+        """
+        clean = [str(x).strip() for x in items if x is not None]
+        if "ZERO" in clean or (len(clean) >= 2 and clean[1] == "ZERO"):
+            return {"op": "ZERO", "reg": clean[0]}
+        elif "==" in clean:
+            return {"op": "==", "arg1": clean[0], "arg2": clean[2]}
+        elif ">" in clean:
+            return {"op": ">", "arg1": clean[0], "arg2": clean[2]}
+        return {"op": "UNKNOWN", "tokens": clean}
 
-    #     # Controleer of we exact de 7 bouwstenen overhouden
-    #     if len(clean_items) < 7:
-    #         raise ValueError(f"[ZScript Error] PARALLEL syntaffout. Verwachtte 7 argumenten, kreeg: {clean_items}")
+    def if_stmt(self, items):
+        if_id = self.loop_counter
+        self.loop_counter += 1
 
-    #     worker_name = clean_items[0] # XOR_WORKER
-    #     src_mem     = clean_items[1] # [INbuffer + X]
-    #     rz_reg      = clean_items[2] # A
-    #     comparator  = clean_items[3] # == of >
-    #     rq_val      = clean_items[4] # B
-    #     dest_reg    = clean_items[5] # A
-    #     dest_mem    = clean_items[6] # [ENCODEbuffer + Y]
+        else_label = f"__IF_ELSE_{if_id}"
+        endif_label = f"__IF_END_{if_id}"
 
-    #     # Helper om basisadres en index-register te splitsen
-    #     def parse_memory_operand(operand):
-    #         inner = operand.strip("[] ")
-    #         if '+' in inner:
-    #             parts = inner.split('+')
-    #             return parts[0].strip(), parts[1].strip()
-    #         return inner, None
+        cond = None
+        mode = "TRUE"
+        has_else = False
+        if_body_lines = []
+        else_body_lines = []
+        in_else = False
 
-    #     src_base, src_idx   = parse_memory_operand(src_mem)
-    #     dest_base, dest_idx = parse_memory_operand(dest_mem)
+        # 1. Doorloop de items en ontleed de conditie, modus en body-regels
+        for item in items:
+            if item is None:
+                continue
 
-    #     pipe_id = self.loop_counter
-    #     self.loop_counter += 1
+            # Als if_condition al is omgezet naar een dict:
+            if isinstance(item, dict) and "op" in item:
+                cond = item
+                continue
 
-    #     # Unieke labels voor deze parallelle pijplijn
-    #     lbl_loop    = f"__PIPE_{pipe_id}_LOOP"
-    #     lbl_harvest = f"__PIPE_{pipe_id}_HARVEST"
-    #     lbl_drain   = f"__PIPE_{pipe_id}_DRAIN"
-    #     lbl_collect = f"__PIPE_{pipe_id}_COLLECT"
-    #     lbl_done    = f"__PIPE_{pipe_id}_DONE"
+            # Fallback als item nog een onbewerkte Lark Tree is:
+            if hasattr(item, 'data') and ('condition' in str(item.data) or item.data == 'if_condition'):
+                children = [str(c).strip() for c in item.children]
+                if "ZERO" in children or (len(children) >= 2 and children[1] == "ZERO"):
+                    cond = {"op": "ZERO", "reg": children[0]}
+                elif "==" in children:
+                    cond = {"op": "==", "arg1": children[0], "arg2": children[2]}
+                elif ">" in children:
+                    cond = {"op": ">", "arg1": children[0], "arg2": children[2]}
+                continue
 
-    #     asm = [f"\n; --- START GEGENEREERDE HARDWARE PARALLEL (Worker: {worker_name}, ID: {pipe_id}) ---"]
+            item_str = str(item).strip()
 
-    #     # --- 1. HOOFDLUS: Laad data in Rz via het index-register ---
-    #     asm.append(f"{lbl_loop}:")
-    #     if src_idx:
-    #         if src_idx != 'I':
-    #             asm.append(f"    LD I, {src_idx}")
-    #         asm.append(f"    LDX {rz_reg}, {src_base}")
-    #     else:
-    #         asm.append(f"    LDM {rz_reg}, {src_base}")
+            if item_str in ("TRUE", "FALSE"):
+                mode = item_str
+                continue
 
-    #     # Evalueer direct de UNTIL stop-conditie
-    #     if comparator == "==":
-    #         asm.append(f"    TSTE {rz_reg}, {rq_val}")
-    #     elif comparator == ">":
-    #         asm.append(f"    TSTG {rz_reg}, {rq_val}")
-    #     asm.append(f"    JMPT {lbl_drain}")
+            if item_str == "ELSE":
+                has_else = True
+                in_else = True
+                continue
 
-    #     # --- 2. CONTEXT SPAWN (Inclusief Z32 matrix-vol check) ---
-    #     asm.append(f"    CONTEXT {rz_reg}, {worker_name}") 
-    #     asm.append(f"    FAIL {lbl_harvest}")  # Matrix vol (< 10 cores)? Spring naar verplicht oogsten.
-        
-    #     # Incrementeer de bron-pointer (asynchroon, mag direct tijdens het rekenen)
-    #     if src_idx:
-    #         asm.append(f"    INC {src_idx}")
+            if item_str in ("IF", "{", "}", "(", ")") or not item_str:
+                continue
 
-    #     # === GREEDY JOIN INTERVALLUM ===
-    #     # Probeer direct de oudste actieve thread te oogsten (non-blocking)
-    #     asm.append(f"    JOIN {dest_reg}, {lbl_loop}")
-        
-    #     # Oogst gelukt (Fallthrough): Schrijf direct weg naar de ENCODEbuffer via dest_idx
-    #     if dest_idx:
-    #         if dest_idx != 'I':
-    #             asm.append(f"    LD I, {dest_idx}")
-    #         asm.append(f"    STX {dest_reg}, {dest_base}")
-    #         asm.append(f"    INC {dest_idx}")
-    #     else:
-    #         asm.append(f"    STO {dest_reg}, {dest_base}")
-    #     asm.append(f"    JMP {lbl_loop}")
+            # Verwerk instructieregels binnen het blok
+            lines = [line.strip() for line in str(item).splitlines() if line.strip()]
+            for line in lines:
+                if line in ("{", "}", "ELSE") or not line:
+                    continue
 
-    #     # --- 3. VERPLICHT OOGSTEN (Bij matrix-verzadiging) ---
-    #     asm.append(f"{lbl_harvest}:")
-    #     asm.append(f"    JOIN {dest_reg}, {lbl_harvest}") 
-    #     if dest_idx:
-    #         if dest_idx != 'I':
-    #             asm.append(f"    LD I, {dest_idx}")
-    #         asm.append(f"    STX {dest_reg}, {dest_base}")
-    #         asm.append(f"    INC {dest_idx}")
-    #     else:
-    #         asm.append(f"    STO {dest_reg}, {dest_base}")
-    #     asm.append(f"    JMP {lbl_loop}")
+                formatted = line if (line.startswith(";") or line.endswith(":") or line.startswith("    ")) else f"    {line}"
 
-    #     # --- 4. LEEGDRAAI-FASE (Invoer is uitgeput, wachten op lopende cores) ---
-    #     asm.append(f"{lbl_drain}:")
-    #     asm.append(f"    SYNC {lbl_collect}")
-    #     asm.append(f"    JMP {lbl_done}")
+                if in_else:
+                    else_body_lines.append(formatted)
+                else:
+                    if_body_lines.append(formatted)
 
-    #     asm.append(f"{lbl_collect}:")
-    #     asm.append(f"    JOIN {dest_reg}, {lbl_collect}")
-    #     if dest_idx:
-    #         if dest_idx != 'I':
-    #             asm.append(f"    LD I, {dest_idx}")
-    #         asm.append(f"    STX {dest_reg}, {dest_base}")
-    #         asm.append(f"    INC {dest_idx}")
-    #     else:
-    #         asm.append(f"    STO {dest_reg}, {dest_base}")
-    #     asm.append(f"    JMP {lbl_drain}")
+        # 2. Bouw de STERN Assembly-output op
+        asm = [f"; --- IF STATEMENT START (ID: {if_id}) ---"]
 
-    #     # --- 5. AFSLUITING (Sluit de buffer netjes af met de stop-waarde) ---
-    #     asm.append(f"{lbl_done}:")
-    #     if dest_idx:
-    #         if dest_idx != 'I':
-    #             asm.append(f"    LD I, {dest_idx}")
-    #         asm.append(f"    STX {rq_val}, {dest_base}")
-    #         asm.append(f"    INC {dest_idx}")
-    #     else:
-    #         asm.append(f"    STO {rq_val}, {dest_base}")
+        # Genereer gegarandeerd de test-instructie vόόr de sprong!
+        if cond:
+            if cond["op"] == "ZERO":
+                asm.append(f"    TSTZ {cond['reg']}")
+            elif cond["op"] == "==":
+                asm.append(f"    TSTE {cond['arg1']}, {cond['arg2']}")
+            elif cond["op"] == ">":
+                asm.append(f"    TSTG {cond['arg1']}, {cond['arg2']}")
 
-    #     asm.append(f"; --- EINDE GEGENEREERDE HARDWARE PARALLEL ---\n")
-    #     return "\n".join(asm)
+        target_label = else_label if has_else else endif_label
 
+        if mode == "TRUE":
+            asm.append(f"    JMPF {target_label}")
+        else:
+            asm.append(f"    JMPT {target_label}")
+
+        for line in if_body_lines:
+            asm.append(line)
+
+        if has_else:
+            asm.append(f"    JMP {endif_label}")
+            asm.append(f"{else_label}:")
+            for line in else_body_lines:
+                asm.append(line)
+
+        asm.append(f"{endif_label}:")
+        asm.append(f"; --- IF STATEMENT END ---")
+
+        return "\n".join(asm)
+
+    
     def arg_list(self, items):
         return [str(i) for i in items]
 

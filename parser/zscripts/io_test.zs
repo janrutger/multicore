@@ -105,5 +105,4 @@ XOR_WORKER:
     LD C A
 
     CLOSE
-    ; RETURN A
 }

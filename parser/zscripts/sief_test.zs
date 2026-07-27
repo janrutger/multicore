@@ -3,7 +3,7 @@ MAP {
     START MAIN
 
     RES list_base 100
-    CONST list_len 90
+    CONST list_len 99
 
     MACRO fill_list(base, len) {
         len -> K
@@ -17,90 +17,98 @@ MAP {
 PROGRAM {
     MAIN:
         fill_list(list_base, list_len)
-        LDI B list_len
+        list_len -> B
+        INC B
+        0 -> I             ; Start-index voor het spawnen
 
-        LDI I 0
-        LDI A 0
-        LDI X 0         ; READ pointer
-        LDI Y 0         ; WRITE pointer
+    SPAWN_LOOP:
+        TSTE I, B             ; Hebben we alle threads geprobeerd te starten?
+        JMPT DRAIN_LOOP       ; Ja -> ga naar de afbouwfase
 
-        PARALLEL (SIEF) USING [list_base + X] UNTIL (A == B) {
-        A -> [list_base + Y]
-        INC Y
-    }
+        ; Probeer een uCore te alloceren en start SIEVE met de huidige index I als context
+        CONTEXT I, SIEVE
+        FAIL HARVEST_ONE      ; Matrix vol (< 10 cores vrij)? Spring naar tijdelijk oogsten
+        INC I                 ; Spawn is gelukt, ga naar de volgende index
 
+        JOIN A SPAWN_LOOP     ; eerst een gready/early harvest
+        JMP SPAWN_LOOP
 
-    HALT
+    HARVEST_ONE:
+        ; De hardware-matrix zit vol. We moeten wachten tot er minimaal één core vrijkomt.
+        ; We doen een JOIN naar dummy-register A. Omdat de worker het resultaat zelf al
+        ; heeft opgeslagen, negeren we de waarde in A. Het doel is enkel de core vrij te maken.
+        JOIN A, HARVEST_ONE
+        JMP SPAWN_LOOP        ; Er is weer een core vrij, probeer opnieuw te spawnen
+
+    DRAIN_LOOP:
+        ; Alle 90 threads zijn gespawned. We wachten nu tot de allerlaatste core klaar is.
+        JOIN A DRAIN_LOOP
+        SYNC DRAIN_LOOP       ; Spring naar drain_loop als er nog 'waiting'contexten zijn
+
+    DONE_LABEL:
+        HALT
+
 
     ; ==========================================================
-    ;  DE SIEF WORKER (Parallel ge ge ge ge-uitgevoerd op uCores)
+    ;  DE SIEVE WORKER (Met decentrale schrijf-operatie)
     ; ==========================================================
-    SIEF:
-        LDI K 0
-        LDI B 1
-        LDI C 0
+    SIEVE:
+        1 -> B
+        0 -> C
         
+        ; Register I bevat de unieke, lokale thread-index voor deze uCore
+        ; LDX A, list_base      ; A = getal dat we gaan testen op prime
+        [list_base + I] -> A
 
-        A -> I
-        ; I (R0) bevat de unieke index voor deze context
-        LDX A list_base      ; A = getal dat we gaan testen op prime
-
-        ; Check 1: Is A == 0? -> Geen prime
         TSTZ A 
         JMPT store_no_prime
+        ; IF (A ZERO) TRUE {
+        ;     JMP store_no_prime
+        ; }
 
-        ; Check 2: Is A == 1? -> Geen prime
-        LDI B 1
-        TSTE A B
+
+        1 -> B 
+        TSTE A, B
         JMPT store_no_prime
 
-        ; Check 3: Is A == 2 of A == 3? -> Direct Prime!
-        LDI B 2
-        TSTE A B
+        INC B                   ; B = 2
+        TSTE A, B
         JMPT store_prime
-        LDI B 3
-        TSTE A B
+        
+
+        INC B                   ; B = 3
+        TSTE A, B
         JMPT store_prime
 
-        ; --- BEREKENINGSLUS VOOR PRIEMGETALLEN ---
-        ; We delen A door deler B (startend vanaf B = 2)
-        LDI B 2
+        2 -> B
 
     PRIME_LOOP:
-        ; Stopconditie: als deler B * B > A, zijn we klaar en is A een PRIME!
-        ; In plaats van een wortelberekening testen we: B * B > A
-        ; Z32 Register-allocatie: K = B * B
-        LDI K 0
-        ADD K B              ; K = B
-        MUL K B              ; K = B * B
+        B -> C
+        MUL C B
         
-        TSTG K A             ; Is (B * B) > A?
-        JMPT store_prime     ; JA -> Alle mogelijke delers geprobeerd, het IS een prime!
+        TSTG C A
+        JMPT store_prime
 
-        ; Test of A deelbaar is door B: C = A % B
-        ; (Z32 MOD zet het resultaat van A % B in een uCore)
-        LDI C 0
-        ADD C A              ; Kopieer A naar C
-        MOD C B              ; C = C % B
+        A -> C
+        MOD C, B
 
-        ; Is de rest 0? Dan is A deelbaar door B, dus GEEN prime!
         TSTZ C
         JMPT store_no_prime
 
-        ; Nog niet klaar? Increment deler B en ga door
         INC B
         JMP PRIME_LOOP
 
-
     store_prime:
-        ; A bevat de oorspronkelijke prime-waarde. Schrijf A terug naar list_base + I
+        ; Schrijf de priemwaarde (A) direct terug naar list_base + I (lokale index)
+        A -> [list_base + I]
         JMP end_sief
 
     store_no_prime:
-        ; Schrijf 0 terug naar list_base + I
-        0 -> A
+        ; Schrijf 0 terug naar list_base + I (lokale index)
+        0 -> A 
+        A -> [list_base + I]
         JMP end_sief
 
     end_sief:
-        CLOSE                ; Beëindig de hardware thread en geef uCore vrij
+        CLOSE                 ; Geef de uCore direct vrij voor de SPAWN_LOOP
 }

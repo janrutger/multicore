@@ -82,6 +82,5 @@ THREAD_WORKER:
     LDI B 1             
     MUL B A  
 
-    RETURN B
-    ;CLOSE
+    CLOSE
 }
