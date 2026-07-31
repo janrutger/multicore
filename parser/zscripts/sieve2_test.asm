@@ -19,88 +19,81 @@ __REP_START_0:
     LDI B, 99
     INC B
     LDI I, 0
-; --- IF STATEMENT START (ID: 2) ---
+; --- START GEGENEREERDE SPAWN PIJPLIJN (ID: 1) ---
+__SPAWN_1_LOOP:
     TSTE I, B
-    JMPT __IF_END_2
-; --- REPEAT LOOP START ---
-__REP_START_1:
+    JMPT __SPAWN_1_DRAIN
     CONTEXT I, SIEVE
-    FAIL HARVEST_ONE
+    FAIL __SPAWN_1_FULL
     INC I
-    JOIN A, RETRY_SPAWN
-RETRY_SPAWN:
-    TSTE I, B
-    JMPF __REP_START_1
-; --- REPEAT LOOP END ---
-__IF_END_2:
-; --- IF STATEMENT END ---
-
-DRAIN_LOOP:
-    JOIN A, DRAIN_LOOP
-    SYNC DRAIN_LOOP
-
-DONE_LABEL:
+    JOIN A, __SPAWN_1_LOOP
+    JMP __SPAWN_1_LOOP
+__SPAWN_1_FULL:
+    JOIN A, __SPAWN_1_FULL
+    JMP __SPAWN_1_LOOP
+__SPAWN_1_DRAIN:
+    JOIN A, __SPAWN_1_DRAIN_WAIT
+__SPAWN_1_DRAIN_WAIT:
+    SYNC __SPAWN_1_DRAIN
+__SPAWN_1_DONE:
+; --- EINDE GEGENEREERDE SPAWN PIJPLIJN ---
     HALT
-
-HARVEST_ONE:
-    JOIN A, HARVEST_ONE
-    JMP RETRY_SPAWN
 
 SIEVE:
     LDI C, 0
     LDX A, 924
-; --- IF STATEMENT START (ID: 3) ---
+; --- IF STATEMENT START (ID: 1) ---
     TSTZ A
+    JMPF __IF_END_1
+    STX A, 924
+    CLOSE
+__IF_END_1:
+; --- IF STATEMENT END ---
+    LDI B, 1
+; --- IF STATEMENT START (ID: 2) ---
+    TSTE A, B
+    JMPF __IF_END_2
+    LDI A, 0
+    STX A, 924
+    CLOSE
+__IF_END_2:
+; --- IF STATEMENT END ---
+    LDI B, 2
+; --- IF STATEMENT START (ID: 3) ---
+    TSTE A, B
     JMPF __IF_END_3
     STX A, 924
     CLOSE
 __IF_END_3:
 ; --- IF STATEMENT END ---
-    LDI B, 1
+    INC B
 ; --- IF STATEMENT START (ID: 4) ---
     TSTE A, B
     JMPF __IF_END_4
-    LDI A, 0
     STX A, 924
     CLOSE
 __IF_END_4:
-; --- IF STATEMENT END ---
-    LDI B, 2
-; --- IF STATEMENT START (ID: 5) ---
-    TSTE A, B
-    JMPF __IF_END_5
-    STX A, 924
-    CLOSE
-__IF_END_5:
-; --- IF STATEMENT END ---
-    INC B
-; --- IF STATEMENT START (ID: 6) ---
-    TSTE A, B
-    JMPF __IF_END_6
-    STX A, 924
-    CLOSE
-__IF_END_6:
 ; --- IF STATEMENT END ---
     LDI B, 2
 
 PRIME_LOOP:
     LD C, B
     MUL C, B
-; --- IF STATEMENT START (ID: 7) ---
+; --- IF STATEMENT START (ID: 5) ---
     TSTG C, A
-    JMPF __IF_END_7
+    JMPF __IF_END_5
     STX A, 924
     CLOSE
-__IF_END_7:
+__IF_END_5:
 ; --- IF STATEMENT END ---
     LD C, A
     MOD C, B
-; --- IF STATEMENT START (ID: 8) ---
+; --- IF STATEMENT START (ID: 6) ---
     TSTZ C
-    JMPF __IF_END_8
+    JMPF __IF_END_6
     STX C, 924
     CLOSE
-__IF_END_8:
+__IF_END_6:
 ; --- IF STATEMENT END ---
     INC B
     JMP PRIME_LOOP

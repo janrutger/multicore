@@ -16,9 +16,7 @@ param_list: IDENTIFIER ("," IDENTIFIER)*
 
 program_block: "PROGRAM" "{" (_NL | program_line)* "}"
 
-# ?program_line: label_def _NL? | (instruction | assignment | macro_call | repeat_stmt) _NL
-?program_line: label_def _NL? | (instruction | assignment | macro_call | repeat_stmt | if_stmt) _NL
-
+?program_line: label_def _NL? | (instruction | assignment | macro_call | repeat_stmt | if_stmt | spawn_stmt) _NL
 
 assignment: assign_source "->" assign_target
 ?assign_source: REGISTER | INT | IDENTIFIER | mem_ref
@@ -27,10 +25,7 @@ assignment: assign_source "->" assign_target
 mem_ref: "[" (IDENTIFIER | INT) "]"
        | "[" (IDENTIFIER | INT) "+" REGISTER "]"
 
-
-# if_stmt: IF_KEYWORD "(" if_condition ")" IF_MODE      "{" (_NL | program_line)* "}" [ ELSE_KEYWORD      "{" (_NL | program_line)* "}" ]
 if_stmt: IF_KEYWORD "(" if_condition ")" IF_MODE _NL? "{" (_NL | program_line)* "}" [ ELSE_KEYWORD _NL? "{" (_NL | program_line)* "}" ]
-
 ?if_condition: REGISTER ZERO_KEYWORD
              | argument COMPARATOR argument
 
@@ -39,13 +34,17 @@ ELSE_KEYWORD.2: "ELSE"
 IF_MODE.2:      "TRUE" | "FALSE"
 ZERO_KEYWORD.2: "ZERO"
 
+spawn_stmt: SPAWN_KEYWORD IDENTIFIER REGISTER UNTIL_KEYWORD "(" if_condition ")" IF_MODE UPDATE_KEYWORD _NL? "{" (_NL | program_line)* "}" HARVEST_KEYWORD REGISTER _NL? "{" (_NL | program_line)* "}"
+
+SPAWN_KEYWORD.2:   "SPAWN"
+UPDATE_KEYWORD.2:  "UPDATE"
+HARVEST_KEYWORD.2: "HARVEST"
+
 repeat_stmt: REPEAT_KEYWORD repeat_tail _NL? "{" (_NL | program_line)* "}"
 repeat_tail: REGISTER TIMES_KEYWORD (INT | IDENTIFIER)
             | UNTIL_KEYWORD "(" argument COMPARATOR argument ")"
             | REGISTER TIMES_KEYWORD (INT | IDENTIFIER) UNTIL_KEYWORD "(" argument COMPARATOR argument ")"
 
-
-# Vaste tokens met hoge prioriteit om lexer-clashes te voorkomen
 REPEAT_KEYWORD.2: "REPEAT"
 TIMES_KEYWORD.2:  "TIMES"
 UNTIL_KEYWORD.2:  "UNTIL"
@@ -74,13 +73,6 @@ WS_INLINE: /[ \\t]+/
 
 
 
-
-
-
-
-
-
-
 # grammar = """
 # start: _NL? map_block _NL? program_block _NL?
 
@@ -99,7 +91,9 @@ WS_INLINE: /[ \\t]+/
 
 # program_block: "PROGRAM" "{" (_NL | program_line)* "}"
 
-# ?program_line: label_def _NL? | (instruction | assignment | macro_call | repeat_stmt) _NL
+# # ?program_line: label_def _NL? | (instruction | assignment | macro_call | repeat_stmt) _NL
+# ?program_line: label_def _NL? | (instruction | assignment | macro_call | repeat_stmt | if_stmt) _NL
+
 
 # assignment: assign_source "->" assign_target
 # ?assign_source: REGISTER | INT | IDENTIFIER | mem_ref
@@ -108,20 +102,28 @@ WS_INLINE: /[ \\t]+/
 # mem_ref: "[" (IDENTIFIER | INT) "]"
 #        | "[" (IDENTIFIER | INT) "+" REGISTER "]"
 
+
+# # if_stmt: IF_KEYWORD "(" if_condition ")" IF_MODE      "{" (_NL | program_line)* "}" [ ELSE_KEYWORD      "{" (_NL | program_line)* "}" ]
+# if_stmt: IF_KEYWORD "(" if_condition ")" IF_MODE _NL? "{" (_NL | program_line)* "}" [ ELSE_KEYWORD _NL? "{" (_NL | program_line)* "}" ]
+
+# ?if_condition: REGISTER ZERO_KEYWORD
+#              | argument COMPARATOR argument
+
+# IF_KEYWORD.2:   "IF"
+# ELSE_KEYWORD.2: "ELSE"
+# IF_MODE.2:      "TRUE" | "FALSE"
+# ZERO_KEYWORD.2: "ZERO"
+
 # repeat_stmt: REPEAT_KEYWORD repeat_tail _NL? "{" (_NL | program_line)* "}"
 # repeat_tail: REGISTER TIMES_KEYWORD (INT | IDENTIFIER)
 #             | UNTIL_KEYWORD "(" argument COMPARATOR argument ")"
 #             | REGISTER TIMES_KEYWORD (INT | IDENTIFIER) UNTIL_KEYWORD "(" argument COMPARATOR argument ")"
 
-# # --- NIEUWE PARALLEL SYNTAX MET DATAFLOW PIJL DRIVERS ---
-# # parallel_stmt: PARALLEL_KEYWORD "(" IDENTIFIER ")" USING_KEYWORD mem_ref UNTIL_KEYWORD "(" argument COMPARATOR argument ")" "{" _NL? REGISTER "->" mem_ref _NL? "}"
 
 # # Vaste tokens met hoge prioriteit om lexer-clashes te voorkomen
 # REPEAT_KEYWORD.2: "REPEAT"
 # TIMES_KEYWORD.2:  "TIMES"
 # UNTIL_KEYWORD.2:  "UNTIL"
-# # PARALLEL_KEYWORD.2: "PARALLEL"
-# # USING_KEYWORD.2:  "USING"
             
 # label_def: IDENTIFIER ":"
 # instruction: MNEMONIC [argument (","? argument)*]
@@ -143,6 +145,14 @@ WS_INLINE: /[ \\t]+/
 # WS_INLINE: /[ \\t]+/
 # %ignore WS_INLINE
 # """
+
+
+
+
+
+
+
+
 
 
 

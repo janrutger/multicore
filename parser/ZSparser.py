@@ -1,3 +1,4 @@
+import re 
 from lark import Lark, Transformer
 from grammer import grammar
 from assemblerV3 import assemble
@@ -18,6 +19,7 @@ class MacroExpander(Transformer):
         self.start_label = None
         self.loop_counter = 0           # Voor unieke lus-labels met REPEAT
         self.macro_call_counter = 0     # voor unike lus-labels in MARCO's
+        self.spawn_counter = 0          # Unieke teller voor SPAWN pijplijnen
 
     def _initialize_allocator(self):
         if not self.allocator_initialized:
@@ -204,9 +206,150 @@ class MacroExpander(Transformer):
         expanded_lines.append(f"; --- Einde macro: {macro_name} ---")
         return "\n".join(expanded_lines)
 
-    # --- DE REPEAT GENERATOR ---
 
-    
+# === GECORRIGEERDE SPAWN HANDLER (WATERDICHTE DRAIN PIJPLIJN) ===
+    def spawn_stmt(self, items):
+        self.spawn_counter += 1
+        spawn_id = self.spawn_counter
+
+        lbl_loop  = f"__SPAWN_{spawn_id}_LOOP"
+        lbl_full  = f"__SPAWN_{spawn_id}_FULL"
+        lbl_drain = f"__SPAWN_{spawn_id}_DRAIN"
+        lbl_wait  = f"__SPAWN_{spawn_id}_DRAIN_WAIT"
+        lbl_done  = f"__SPAWN_{spawn_id}_DONE"
+
+        clean_items = [x for x in items if x is not None]
+
+        worker_label = str(clean_items[1]).strip()
+        input_reg    = str(clean_items[2]).strip()
+
+        cond_item = clean_items[4]
+        cond = None
+        if isinstance(cond_item, dict):
+            cond = cond_item
+        elif hasattr(cond_item, 'children'):
+            children = [str(c).strip() for c in cond_item.children]
+            if "ZERO" in children or (len(children) >= 2 and children[1] == "ZERO"):
+                cond = {"op": "ZERO", "reg": children[0]}
+            elif "==" in children:
+                cond = {"op": "==", "arg1": children[0], "arg2": children[2]}
+            elif ">" in children:
+                cond = {"op": ">", "arg1": children[0], "arg2": children[2]}
+
+        if_mode = str(clean_items[5]).strip()
+
+        update_idx = -1
+        harvest_idx = -1
+        for i, item in enumerate(clean_items):
+            s = str(item).strip()
+            if s == "UPDATE":
+                update_idx = i
+            elif s == "HARVEST":
+                harvest_idx = i
+
+        harvest_reg = str(clean_items[harvest_idx + 1]).strip()
+
+        def extract_lines(slice_items):
+            lines = []
+            for item in slice_items:
+                s = str(item).strip()
+                if s in ("UPDATE", "HARVEST", "{", "}", "(", ")") or not s:
+                    continue
+                for line in str(item).splitlines():
+                    line_str = line.strip()
+                    if line_str in ("{", "}", "UPDATE", "HARVEST") or not line_str:
+                        continue
+                    formatted = line_str if (line_str.startswith(";") or line_str.endswith(":") or line_str.startswith("    ")) else f"    {line_str}"
+                    lines.append(formatted)
+            return lines
+
+        update_lines  = extract_lines(clean_items[update_idx + 1:harvest_idx])
+        harvest_lines = extract_lines(clean_items[harvest_idx + 2:])
+
+        # HELPER: SITE-TAGGING VOOR DE 3 HARVEST EMISSIES
+        def tag_harvest_lines(lines, tag):
+            if not lines:
+                return []
+            
+            local_labels = set()
+            for line in lines:
+                l_str = line.strip()
+                if l_str.endswith(":") and not l_str.startswith(";"):
+                    local_labels.add(l_str[:-1].strip())
+
+            if not local_labels:
+                return lines
+
+            tagged_lines = []
+            for line in lines:
+                mod_line = line
+                for lbl in local_labels:
+                    mod_line = re.sub(rf'\b{re.escape(lbl)}\b', f"{lbl}_{tag}", mod_line)
+                tagged_lines.append(mod_line)
+            return tagged_lines
+
+        harvest_early = tag_harvest_lines(harvest_lines, "EARLY")
+        harvest_full  = tag_harvest_lines(harvest_lines, "FULL")
+        harvest_drain = tag_harvest_lines(harvest_lines, "DRAIN")
+
+        test_instr = ""
+        if cond:
+            if cond["op"] == "ZERO":
+                test_instr = f"    TSTZ {cond['reg']}"
+            elif cond["op"] == "==":
+                test_instr = f"    TSTE {cond['arg1']}, {cond['arg2']}"
+            elif cond["op"] == ">":
+                test_instr = f"    TSTG {cond['arg1']}, {cond['arg2']}"
+
+        jump_drain = f"    JMPT {lbl_drain}" if if_mode == "TRUE" else f"    JMPF {lbl_drain}"
+
+        asm = [f"; --- START GEGENEREERDE SPAWN PIJPLIJN (ID: {spawn_id}) ---"]
+
+        # 1. HOOFDLUS (Evalueer stopconditie & Vuur CONTEXT af)
+        asm.append(f"{lbl_loop}:")
+        if test_instr:
+            asm.append(test_instr)
+        asm.append(jump_drain)
+
+        asm.append(f"    CONTEXT {input_reg}, {worker_label}")
+        asm.append(f"    FAIL {lbl_full}")
+
+        # UPDATE (Pas na geslaagde spawn!)
+        for line in update_lines:
+            asm.append(line)
+
+        # 2. EARLY GREEDY HARVEST
+        asm.append(f"    JOIN {harvest_reg}, {lbl_loop}")
+        for line in harvest_early:
+            asm.append(line)
+        asm.append(f"    JMP {lbl_loop}")
+
+        # 3. MATRIX FULL HANDLER
+        asm.append(f"{lbl_full}:")
+        asm.append(f"    JOIN {harvest_reg}, {lbl_full}")
+        for line in harvest_full:
+            asm.append(line)
+        asm.append(f"    JMP {lbl_loop}")
+
+        # 4. WATERDICHTE DRAIN FASE (Met correcte SYNC-loopback)
+        asm.append(f"{lbl_drain}:")
+        asm.append(f"    JOIN {harvest_reg}, {lbl_wait}")
+        for line in harvest_drain:
+            asm.append(line)
+        asm.append(f"{lbl_wait}:")
+        asm.append(f"    SYNC {lbl_drain}")
+        asm.append(f"{lbl_done}:")
+        asm.append(f"; --- EINDE GEGENEREERDE SPAWN PIJPLIJN ---")
+
+        return "\n".join(asm)
+
+
+
+
+
+
+
+    # --- DE REPEAT GENERATOR ---
     def repeat_tail(self, items):
         # Filter haakjes of andere onnodige leestekens direct weg
         clean_items = [str(x) for x in items if str(x) not in ("(", ")")]

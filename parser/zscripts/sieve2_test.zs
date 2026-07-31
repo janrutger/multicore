@@ -20,39 +20,23 @@ PROGRAM {
         fill_list(list_base, list_len)
         list_len -> B
         INC B
-        0 -> I             ; Start-index voor het spawnen
+        0 -> I             ; Start-index voor het spawnen van workers
 
     ; ==========================================================
-    ;  WHILE (I != B) LUS-STRUCTUUR (PRE-TEST)
+    ;  DE VOLLEDIGE PARALLELLE STREAMING PIJPLIJN
     ; ==========================================================
-    IF (I == B) FALSE {
-        REPEAT UNTIL (I == B) {
-            CONTEXT I, SIEVE
-            FAIL HARVEST_ONE      ; Matrix vol? Spring naar verplicht oogsten
-            INC I                 ; Spawn gelukt, volgende index
-
-            JOIN A RETRY_SPAWN    ; Early greedy harvest
-        RETRY_SPAWN:
-        }
+    SPAWN SIEVE I UNTIL (I == B) TRUE UPDATE {
+        INC I              ; Wordt PAS geëxecuteerd na een geslaagde CONTEXT spawn!
+    } HARVEST A {
+        ; De worker-thread heeft zijn resultaat zelf al decentraal weggeschreven.
+        ; Het HARVEST-blok bevrijdt hier enkel de uCore via dummy-register A.
     }
 
-    DRAIN_LOOP:
-        ; Alle threads zijn gespawned. Wacht op de allerlaatste core.
-        JOIN A DRAIN_LOOP
-        SYNC DRAIN_LOOP
-
-    DONE_LABEL:
-        HALT
-
-    HARVEST_ONE:
-        ; De hardware-matrix zit vol. Wacht tot er 1 core vrijkomt.
-        JOIN A, HARVEST_ONE
-        JMP RETRY_SPAWN       ; Keer direct terug in de WHILE-lus
-
+    HALT
 
 
     ; ==========================================================
-    ;  DE SIEVE WORKER (Met gestructureerde IF-logica)
+    ;  DE SIEVE WORKER (Met gestructureerde IF-logica & Core-Besparing)
     ; ==========================================================
     SIEVE:
         0 -> C
@@ -62,13 +46,13 @@ PROGRAM {
 
         ; 1. Basisgevallen: 0 en 1 zijn GEEN priemgetallen
         IF (A ZERO) TRUE {
-            A -> [list_base + I]        ; 'A' holds zero
+            A -> [list_base + I]        ; 'A' bevat al 0
             CLOSE
         }
 
         1 -> B
         IF (A == B) TRUE {
-            0 -> A                      ; 'A' holds zero
+            0 -> A                      ; Hergebruik 'A' als 0
             A -> [list_base + I]
             CLOSE
         }
@@ -102,7 +86,7 @@ PROGRAM {
         A -> C
         MOD C, B
         IF (C ZERO) TRUE {
-            C -> [list_base + I]                ; 'C' holds zero
+            C -> [list_base + I]        ; 'C' bevat al 0 na de modulo (bespaart 1 uCore)
             CLOSE
         }
 

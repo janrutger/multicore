@@ -1,0 +1,113 @@
+; --- BOOTSTRAP VECTOR ---
+    JMP MAIN
+; ------------------------
+
+main:
+    LDI I, 0
+    LDI B, 27
+; --- REPEAT LOOP START ---
+__REP_START_0:
+; --- Start hygiënische macro: KBDread (ID: 1) ---
+__M1_POLL_LUS:
+    IOSYNC
+    IN A, 6
+    TSTZ A
+    JMPT __M1_POLL_LUS
+; --- Einde macro: KBDread ---
+    STX A, 1008
+    INC I
+    TSTE A, B
+    JMPF __REP_START_0
+; --- REPEAT LOOP END ---
+    LDI X, 0
+    LDI Y, 0
+    LD I, X
+    LDX A, 1008
+; --- START GEGENEREERDE SPAWN PIJPLIJN (ID: 1) ---
+__SPAWN_1_LOOP:
+    TSTE A, B
+    JMPT __SPAWN_1_DRAIN
+    CONTEXT A, XOR_WORKER
+    FAIL __SPAWN_1_FULL
+    INC X
+    LD I, X
+    LDX A, 1008
+    JOIN C, __SPAWN_1_LOOP
+; --- IF STATEMENT START (ID: 1) ---
+    TSTZ C
+    JMPT __IF_END_1_EARLY
+    LD I, Y
+    STX C, 992
+    INC Y
+__IF_END_1_EARLY:
+; --- IF STATEMENT END ---
+    JMP __SPAWN_1_LOOP
+__SPAWN_1_FULL:
+    JOIN C, __SPAWN_1_FULL
+; --- IF STATEMENT START (ID: 1) ---
+    TSTZ C
+    JMPT __IF_END_1_FULL
+    LD I, Y
+    STX C, 992
+    INC Y
+__IF_END_1_FULL:
+; --- IF STATEMENT END ---
+    JMP __SPAWN_1_LOOP
+__SPAWN_1_DRAIN:
+    JOIN C, __SPAWN_1_DRAIN_WAIT
+; --- IF STATEMENT START (ID: 1) ---
+    TSTZ C
+    JMPT __IF_END_1_DRAIN
+    LD I, Y
+    STX C, 992
+    INC Y
+__IF_END_1_DRAIN:
+; --- IF STATEMENT END ---
+__SPAWN_1_DRAIN_WAIT:
+    SYNC __SPAWN_1_DRAIN
+__SPAWN_1_DONE:
+; --- EINDE GEGENEREERDE SPAWN PIJPLIJN ---
+    LDI X, 0
+    LDI Y, 0
+    LD I, X
+    LDX A, 1008
+; --- START GEGENEREERDE SPAWN PIJPLIJN (ID: 2) ---
+__SPAWN_2_LOOP:
+    TSTE A, B
+    JMPT __SPAWN_2_DRAIN
+    CONTEXT A, XOR_WORKER
+    FAIL __SPAWN_2_FULL
+    INC X
+    LD I, X
+    LDX A, 1008
+    JOIN C, __SPAWN_2_LOOP
+    LD I, Y
+    STX C, 992
+    INC Y
+    JMP __SPAWN_2_LOOP
+__SPAWN_2_FULL:
+    JOIN C, __SPAWN_2_FULL
+    LD I, Y
+    STX C, 992
+    INC Y
+    JMP __SPAWN_2_LOOP
+__SPAWN_2_DRAIN:
+    JOIN C, __SPAWN_2_DRAIN_WAIT
+    LD I, Y
+    STX C, 992
+    INC Y
+__SPAWN_2_DRAIN_WAIT:
+    SYNC __SPAWN_2_DRAIN
+__SPAWN_2_DONE:
+; --- EINDE GEGENEREERDE SPAWN PIJPLIJN ---
+    LD I, Y
+    STX B, 992
+    HALT
+
+XOR_WORKER:
+    LDI K, 13
+    LDI C, 0
+    XOR A, K
+    LD C, A
+    MUL A, C
+    CLOSE
