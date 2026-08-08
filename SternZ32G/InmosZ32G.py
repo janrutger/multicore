@@ -96,7 +96,26 @@ class CPU:
                     if not in_master_register and not in_thread_register and not is_test_core and not wordt_nog_bezocht:
                         core.coreStatus = 'IDLE'
 
-            # 2. CONTEXT SCHEDULER: Tik exact ÉÉN actieve context aan die RUNNING is
+            # # 2. CONTEXT SCHEDULER: Tik exact ÉÉN actieve context aan die RUNNING is
+            # active_running_contexts = [c for c in self.contexts if c.fsm_state in ('FETCH', 'DECODE', 'EXECUTE', 'RUNNING')]
+            
+            # if active_running_contexts:
+            #     # Veiligheidsmarge: mocht de lijst gekrompen zijn, zorg dat we nooit Out-of-Bounds gaan
+            #     if self.current_context_index >= len(active_running_contexts):
+            #         self.current_context_index = 0
+                    
+            #     # Pak de context die nu gegarandeerd aan de beurt is
+            #     target_context = active_running_contexts[self.current_context_index]
+                
+            #     # Voer de FSM-stap uit voor deze specifieke context
+            #     self._execute_cycle(self, target_context)
+                
+            #     # Schuif de pointer door naar de volgende context EN pas direct modulo toe 
+            #     # zodat de waarde direct klopt en opgeslagen wordt voor de volgende tick.
+            #     self.current_context_index = (self.current_context_index + 1) % len(active_running_contexts)
+
+            # 2. CONTEXT SCHEDULER: Slimme dubbele tick bij FETCH
+            
             active_running_contexts = [c for c in self.contexts if c.fsm_state in ('FETCH', 'DECODE', 'EXECUTE', 'RUNNING')]
             
             if active_running_contexts:
@@ -104,16 +123,19 @@ class CPU:
                 if self.current_context_index >= len(active_running_contexts):
                     self.current_context_index = 0
                     
-                # Pak de context die nu gegarandeerd aan de beurt is
                 target_context = active_running_contexts[self.current_context_index]
                 
-                # Voer de FSM-stap uit voor deze specifieke context
-                self._execute_cycle(self, target_context)
-                
-                # Schuif de pointer door naar de volgende context EN pas direct modulo toe 
-                # zodat de waarde direct klopt en opgeslagen wordt voor de volgende tick.
+                # --- JOUW ELEGANTE LOGICA ---
+                if target_context.fsm_state == 'FETCH':
+                    # Run 2 ticks: Fetch pakt de instructie, de 2e tick voert DECODE direct uit!
+                    self._execute_cycle(self, target_context)
+                    self._execute_cycle(self, target_context)
+                else:
+                    # Run 1 tick: Voor DECODE, EXECUTE of hardware stalls
+                    self._execute_cycle(self, target_context)
+            
+                # Schuif de Round Robin pointer netjes door
                 self.current_context_index = (self.current_context_index + 1) % len(active_running_contexts)
-
 
 
             # 3. Voer DAARNA de huidige hoofd-CPU instructie uit

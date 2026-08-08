@@ -75,15 +75,18 @@ class SternZ32Mainboard:
 
     def gameloop(self):
         """De ononderbroken klok-trein (Heartbeat) van de Inmos-Z32 en IO-Controller"""
-    
+        IO_PRESCALER = 5000  # Voer pas een I/O-tick uit om de 5000 CPU-clocks
         # 1. Bestook de CPU en chipset met een batch kloktikken
         for _ in range(self.cycles_per_frame):
             if not self.cpu.is_completely_idle():
                 # Voer de werkelijke hardware tick uit op de CPU
                 self.cpu.tick()
                 
-                # ENKELE TICK VOOR DE IO CONTROLLER (Achtergrond-renderers van displays verversen)
-                self.io_controller.tick()
+                # # ENKELE TICK VOOR DE IO CONTROLLER (Achtergrond-renderers van displays verversen)
+                # self.io_controller.tick()
+                # 2. I/O Controller tikt op een lagere frequentie
+                if self.totale_ticks % IO_PRESCALER == 0:
+                    self.io_controller.tick()
                 
                 self.totale_ticks += 1
 
@@ -113,6 +116,7 @@ class SternZ32Mainboard:
                         print(c_log)
                     
             else:
+                self.io_controller.tick()       # flush the IO pipeline
                 break
                 
         # 2. BINNEN-FRAME REFRESH: Update de uCore LEDs op het frontpaneel
@@ -185,8 +189,8 @@ class SternZ32Mainboard:
         print("             GEHEUGEN DUMP (Adres 1023 - 23)              ")
         print("==========================================================")
         
-        start_adres = 1024 - 50
-        aantal_adressen = 50
+        start_adres = 1024 - 200
+        aantal_adressen = 200
         
         for i in range(aantal_adressen):
             current_addr = start_adres + i

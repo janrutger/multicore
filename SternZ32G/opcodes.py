@@ -128,6 +128,11 @@ MICROCODE_ROM = {
     'shftl':  ['valid_v', 'mv_tw',   'shftl_vw', 'setResult'],
     'rol32':  ['valid_v', 'mv_tw',   'rol32_vw', 'setResult'],
 
+    'addi':   ['valid_v', 'mv_tw', 'add', 'setResult'],
+    'subi':   ['valid_v', 'mv_tw', 'sub', 'setResult'],
+    'muli':   ['valid_v', 'mv_tw', 'mul', 'setResult'],
+    'divi':   ['valid_v', 'mv_tw', 'div', 'setResult'],
+
 
    'slow_mul': [
         'valid_v',             # 0: Wacht op A en onthoud teken

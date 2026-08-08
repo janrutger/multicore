@@ -190,6 +190,50 @@ def _execute_cycleZ32(master_cpu, target):
             target.registers[reg1] = core_id
             target.last_active_core = core_id
 
+        elif opcode == Op.ADDI:
+            if not master_cpu.free_cores: return # Stall
+            core_id = master_cpu.free_cores.popleft()
+            
+            src1_core = target.registers[reg1]
+            master_cpu.cores[core_id].transfer = arg2
+            
+            master_cpu.cores[core_id].dispatch('addi', arg1=src1_core, arg2=None)
+            target.registers[reg1] = core_id
+            target.last_active_core = core_id
+
+        elif opcode == Op.SUBI:
+            if not master_cpu.free_cores: return # Stall
+            core_id = master_cpu.free_cores.popleft()
+            
+            src1_core = target.registers[reg1]
+            master_cpu.cores[core_id].transfer = arg2
+            
+            master_cpu.cores[core_id].dispatch('subi', arg1=src1_core, arg2=None)
+            target.registers[reg1] = core_id
+            target.last_active_core = core_id
+
+        elif opcode == Op.MULI:
+            if not master_cpu.free_cores: return # Stall
+            core_id = master_cpu.free_cores.popleft()
+            
+            src1_core = target.registers[reg1]
+            master_cpu.cores[core_id].transfer = arg2
+            
+            master_cpu.cores[core_id].dispatch('muli', arg1=src1_core, arg2=None)
+            target.registers[reg1] = core_id
+            target.last_active_core = core_id
+
+        elif opcode == Op.DIVI:
+            if not master_cpu.free_cores: return # Stall
+            core_id = master_cpu.free_cores.popleft()
+            
+            src1_core = target.registers[reg1]
+            master_cpu.cores[core_id].transfer = arg2
+            
+            master_cpu.cores[core_id].dispatch('divi', arg1=src1_core, arg2=None)
+            target.registers[reg1] = core_id
+            target.last_active_core = core_id
+
         elif opcode == Op.INC:
             if not master_cpu.free_cores: return # Stall
             core_id = master_cpu.free_cores.popleft()
