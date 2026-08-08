@@ -22,7 +22,7 @@ class SternZ32Mainboard:
         
         # 2. Initialiseer de CPU hardware matrix (32 cores + context switches)
         self.cpu = CPU()
-        self.show_log = True
+        self.show_log = False
         
         # 3. UPGRADE: Soldeer de IOController op het mainboard chipset-vlak
         self.io_controller = IOController(self.root)
@@ -189,8 +189,8 @@ class SternZ32Mainboard:
         print("             GEHEUGEN DUMP (Adres 1023 - 23)              ")
         print("==========================================================")
         
-        start_adres = 1024 - 200
-        aantal_adressen = 200
+        start_adres = 1024 - 10
+        aantal_adressen = 10
         
         for i in range(aantal_adressen):
             current_addr = start_adres + i

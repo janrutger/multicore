@@ -493,6 +493,31 @@ def _execute_cycleZ32(master_cpu, target):
             target.fsm_state = 'DONE'
             return
 
+        elif opcode == Op.AUTOCLOSE:
+            if target == master_cpu:
+                raise RuntimeError("Hardware Fault: De master-CPU mag AUTOCLOSE niet aanroepen!")
+            
+            # 1. Interlock check: Wacht tot de microcode op alle rekenketens 'VALID' is
+            for core_id in target.registers.values():
+                if core_id is not None:
+                    if master_cpu.cores[core_id].coreStatus == 'WORKING':
+                        target.fsm_state = 'EXECUTE'
+                        return 
+
+            # 2. HARDWARE OPTIMALISATIE: Zet cores direct op IDLE voor 1-tick pool versnelling!
+            for core_id in target.registers.values():
+                if core_id is not None:
+                    master_cpu.cores[core_id].coreStatus = 'IDLE'
+
+            # 3. Formele deactivatie van de thread
+            target.fsm_state = 'HALT'
+
+            # 4. Verwijder uit contexts -> GC STAP A pakt de IDLE cores in dezelfde tik direct op!
+            if target in master_cpu.contexts:
+                master_cpu.contexts.remove(target)
+                
+            return
+
         # elif opcode == Op.RETURN:
         #     if target == master_cpu:
         #         raise RuntimeError("Hardware Fault: De master-CPU mag CLOSE niet aanroepen!")

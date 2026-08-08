@@ -24,10 +24,10 @@ MAP {
 PROGRAM {
 main:
     ; --- 1. INITIALISATIE VAN HET RASTER ---
-    1 -> A
+    0 -> A
     0 -> I
     0 -> B
-    0 -> M
+    ; 0 -> M
     0 -> X
     0 -> Y 
 
@@ -45,61 +45,87 @@ main:
     ;  HOOFD SIMULATIE LUS (Draait 30 diffusie-stappen)
     ; ==========================================================
     75 -> Y                 ; Y telt de simulatierondes (iteraties) 75
+    
 SIMULATIE_STAP:
     0 -> X                 ; Start-index X bij cel 0 voor de SPAWN pijplijn
     GRID_SIZE -> B
 
     ; --- 2. PARALLELLE REKEN-FASE (32 uCores Matrix) ---
-    SPAWN HEAT_WORKER X UNTIL (X == B) TRUE UPDATE {
-        INC X
-    } HARVEST A {
-        ; Enkel uCore vrijmaken; resultaat staat al decentraal in grid_next
+    REPEAT UNTIL (X == B) {
+        spawn:
+            CONTEXT X HEAT_WORKER
+            FAIL spawn
+        INC X    
     }
+    ; VERPLICHT: Wacht tot alle 400 gespawnde workers via AUTOCLOSE klaar zijn
+    ; voordat de Master-CPU het geheugen gaat uitlezen om het scherm te tekenen!
+    WAIT_MATRIX:
+        SYNC WAIT_MATRIX
 
-    ; --- 3. SERIËLE IN-ORDER DISPLAY-FASE (Master CPU) ---
-    0 -> I
-    REPEAT I TIMES GRID_SIZE {
-        [grid_next + I] -> C
-
-        ; SLIMME I/O FILTER: Verstuur ALLEEN als de temperatuur > 0 is!
-        IF (C ZERO) FALSE {
-            GRAPH_DEV -> A
-            PLOT_CMD  -> B
-
-            OUT A DEV
-            DIVI C 5              ; Schaal temperatuur naar kleurpalet
-            OUT C VAL             ; Kleurcode op basis van temperatuur
-
-            ; Scherm X-coördinaat: (I % ROW_SIZE) * 10 pixels
-            I -> M
-            ROW_SIZE -> A
-            MOD M A
-            MULI M 5
-            OUT M X_POS
-
-            ; Scherm Y-coördinaat: (I / ROW_SIZE) * 10 pixels
-            I -> M
-            DIVI M ROW_SIZE
-            MULI M 5
-            OUT M Y_POS
-
-            OUT B CMD             ; Trigger plot op GraphicalDisplay
-            IOSYNC
-        }
-    }
-
-    ; --- 4. SWAP BUFFERS (Kopieer grid_next naar grid_current) ---
+    ; --- 3. SWAP BUFFERS (Kopieer grid_next naar grid_current) ---
     0 -> I
     REPEAT I TIMES GRID_SIZE {
         [grid_next + I] -> A
         A -> [grid_current + I]
     }
 
+    ; --- 4. Spawn DISPLAY worker (thread space) ---
+    0 -> I
+    spawn_disp:
+        CONTEXT I DISPLAY_WORKER
+        FAIL spawn_disp
+
+    
+
     DEC Y
     TSTZ Y
     JMPF SIMULATIE_STAP   ; Voer opeenvolgende diffusie-rondes uit
 
+    END_MATRIX:
+        SYNC END_MATRIX
+
     HALT
+
+    ; ==========================================================
+    ; DISPLAY WORKER (Puur I/O)
+    ; ==========================================================
+    DISPLAY_WORKER:
+        0 -> C 
+        0 -> M 
+
+        REPEAT I TIMES GRID_SIZE {
+            [grid_current + I] -> C
+
+            ; SLIMME I/O FILTER: Verstuur ALLEEN als de temperatuur > 0 is!
+            IF (C ZERO) FALSE {
+                GRAPH_DEV -> A
+                PLOT_CMD  -> B
+
+                OUT A DEV
+                DIVI C 5              ; Schaal temperatuur naar kleurpalet
+                OUT C VAL             ; Kleurcode op basis van temperatuur
+
+                ; Scherm X-coördinaat: (I % ROW_SIZE) * 10 pixels
+                I -> M
+                ROW_SIZE -> A
+                MOD M A
+                MULI M 5
+                OUT M X_POS
+
+                ; Scherm Y-coördinaat: (I / ROW_SIZE) * 10 pixels
+                I -> M
+                DIVI M ROW_SIZE
+                MULI M 5
+                OUT M Y_POS
+
+                OUT B CMD             ; Trigger plot op GraphicalDisplay
+                IOSYNC
+            }
+        }
+        AUTOCLOSE
+
+
+
 
     ; ==========================================================
     ;  PARALLELLE WARMTE WORKER (Puur Rekenwerk, Nul I/O)
@@ -117,14 +143,14 @@ SIMULATIE_STAP:
 
         IF (A ZERO) TRUE {
             A -> [grid_next + X]
-            CLOSE
+            AUTOCLOSE
         }
 
         LAST_COL -> B
         IF (A == B) TRUE {
             0 -> A
             A -> [grid_next + X]
-            CLOSE
+            AUTOCLOSE
         }
 
         ; --- GUARD 1b: Bovenrand (X < ROW_SIZE) ---
@@ -132,7 +158,7 @@ SIMULATIE_STAP:
         IF (B > X) TRUE {
             0 -> A
             A -> [grid_next + X]
-            CLOSE
+            AUTOCLOSE
         }
 
         ; --- GUARD 1c: Onderrand (X >= BOTTOM_START) ---
@@ -141,7 +167,7 @@ SIMULATIE_STAP:
         IF (X > B) TRUE {
             0 -> A
             A -> [grid_next + X]
-            CLOSE
+            AUTOCLOSE
         }
 
         ; --- GUARD 2: Permanente Warmtebron op cel HEAT_SOURCE (210) ---
@@ -149,7 +175,7 @@ SIMULATIE_STAP:
         IF (X == B) TRUE {
             70 -> A
             A -> [grid_next + X]
-            CLOSE
+            AUTOCLOSE
         }
 
         ; --- 4-BUREN DIFFUSIE BEREKENING ---
@@ -183,5 +209,5 @@ SIMULATIE_STAP:
         ; Schrijf het resultaat weg naar de OORSPRONKELIJKE cel X!
         A -> [grid_next + X]
         ; Just return A 
-        CLOSE
+        AUTOCLOSE
 }

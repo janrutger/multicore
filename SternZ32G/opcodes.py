@@ -11,7 +11,8 @@ class Op(IntEnum):
     # DI    = 14
     # RTI   = 15
 
-    CLOSE = 29      # Implemented
+    CLOSE     = 29      # Implemented
+    AUTOCLOSE = 13      # Implemented
 
     # --- FORMAT: ONE_ADDR ---
     JMPF  = 20      # Implemented
@@ -33,10 +34,10 @@ class Op(IntEnum):
     IN    = 35      # NEW: Lees IO reg# naar register Rx
     STO   = 40      # Implemented
     STX   = 41      # Implemented
-    ADDI  = 51
-    SUBI  = 53
-    MULI  = 61
-    DIVI  = 63
+    ADDI  = 51      # Implemented
+    SUBI  = 53      # Implemented
+    MULI  = 61      # Implemented
+    DIVI  = 63      # Implemented
     TST   = 70
     ANDI  = 82
     # STACK = 92
@@ -72,7 +73,7 @@ class Op(IntEnum):
     TSTZ  = 73     # Implemented
 
 # Vaste sets voor de decoder om snel het format te matchen
-FORMAT_ZERO        = {Op.NOP, Op.HALT, Op.CLOSE, Op.IOSYNC}
+FORMAT_ZERO        = {Op.NOP, Op.HALT, Op.CLOSE, Op.IOSYNC, Op.AUTOCLOSE}
 FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.SUCCES, Op.FAIL, Op.SYNC}
 FORMAT_ONE_REG     = {Op.INC, Op.DEC, Op.TSTZ}
 FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.TSTE, Op.TSTG, Op.XOR}
