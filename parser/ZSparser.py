@@ -133,6 +133,11 @@ class MacroExpander(Transformer):
         macro_name = str(items[0])
         args = items[1] if len(items) > 1 else []
 
+        # === FIX VOOR LEGE ARGUMENTENLIJST ===
+        if args is None:
+            args = []
+        # =====================================
+
         if macro_name not in self.macro_table:
             raise NameError(f"Fout: Macro '{macro_name}' is niet gedefinieerd!")
 

@@ -20,24 +20,42 @@ class GraphicalDisplay:
         
         # --- HARDWARE PALETTE LOOKUP TABLE (LUT) - 16 KLEUREN ---
         # Standaard 16-kleuren palet (CGA / EGA geïnspireerd, geoptimaliseerd voor warmtekaarten)
+        # self.palette = {
+        #     0:  "#000000",  # Zwart (Koud / Achtergrond)
+        #     1:  "#000080",  # Donkerblauw
+        #     2:  "#0000FF",  # Blauw
+        #     3:  "#0080FF",  # Lichtblauw
+        #     4:  "#00FFFF",  # Cyan
+        #     5:  "#00FF80",  # Turkoois / Mint
+        #     6:  "#00FF00",  # Felgroen
+        #     7:  "#80FF00",  # Geelgroen
+        #     8:  "#FFFF00",  # Geel
+        #     9:  "#FFC800",  # Goud / Oranjegeel
+        #     10: "#FF8000",  # Oranje
+        #     11: "#FF4000",  # Roodoranje
+        #     12: "#FF0000",  # Felrood
+        #     13: "#FF0080",  # Roze / Magenta
+        #     14: "#FF80FF",  # Lichtmagenta
+        #     15: "#FFFFFF"   # Helderwit (Maximale hitte)
+        # }
         self.palette = {
-            0:  "#000000",  # Zwart (Koud / Achtergrond)
-            1:  "#000080",  # Donkerblauw
-            2:  "#0000FF",  # Blauw
-            3:  "#0080FF",  # Lichtblauw
-            4:  "#00FFFF",  # Cyan
-            5:  "#00FF80",  # Turkoois / Mint
-            6:  "#00FF00",  # Felgroen
-            7:  "#80FF00",  # Geelgroen
-            8:  "#FFFF00",  # Geel
-            9:  "#FFC800",  # Goud / Oranjegeel
-            10: "#FF8000",  # Oranje
-            11: "#FF4000",  # Roodoranje
-            12: "#FF0000",  # Felrood
-            13: "#FF0080",  # Roze / Magenta
-            14: "#FF80FF",  # Lichtmagenta
-            15: "#FFFFFF"   # Helderwit (Maximale hitte)
-        }
+            0:  "#000000",  # 0: Zwart (Achtergrond / Nul-punt)
+            1:  "#000055",  # 1: Zeer donkerblauw (Ijskoud)
+            2:  "#0000BB",  # 2: Diepblauw
+            3:  "#0055FF",  # 3: Helderblauw
+            4:  "#00AAFF",  # 4: Hemelsblauw / Cyan
+            5:  "#00FFCC",  # 5: Mint / Aquamarijn
+            6:  "#00CC00",  # 6: Diepgroen
+            7:  "#88FF00",  # 7: Fel Lime/Geelgroen
+            8:  "#FFFF00",  # 8: Puur Geel
+            9:  "#FFBB00",  # 9: Goud / Warmgeel
+            10: "#FF7700",  # 10: Helder Oranje
+            11: "#FF3300",  # 11: Roodoranje
+            12: "#D00000",  # 12: Dieprood
+            13: "#FF0055",  # 13: Fel Felrood / Crimson
+            14: "#FFAA55",  # 14: Gloeiend Oranje-Geel (Zeer heet)
+            15: "#FFFFFF"   # 15: Helderwit (Kern van de warmtebron)
+}
 
         # Teken-oppervlak
         self.canvas = tk.Canvas(self.window, width=self.width, height=self.height, bg="#000000", highlightthickness=0)

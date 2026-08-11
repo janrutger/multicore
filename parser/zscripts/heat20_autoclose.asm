@@ -3,7 +3,7 @@
 ; ------------------------
 
 main:
-    LDI A, 1
+    LDI A, 0
     LDI I, 0
     LDI B, 0
     LDI X, 0
@@ -27,16 +27,19 @@ SIMULATIE_STAP:
     LDI B, 399
 ; --- REPEAT LOOP START ---
 __REP_START_1:
-spawn:
+; --- Start hygiënische macro: startTask (ID: 1) ---
+__M1__spawntask:
     CONTEXT X, HEAT_WORKER
-    FAIL spawn
+    FAIL __M1__spawntask
+; --- Einde macro: startTask ---
     INC X
     TSTE X, B
     JMPF __REP_START_1
 ; --- REPEAT LOOP END ---
-
-WAIT_MATRIX:
-    SYNC WAIT_MATRIX
+; --- Start hygiënische macro: waitMatrix (ID: 2) ---
+__M2__waitMatrix:
+    SYNC __M2__waitMatrix
+; --- Einde macro: waitMatrix ---
     LDI I, 0
     LDI I, 399
 ; --- REPEAT LOOP START ---
@@ -55,9 +58,10 @@ spawn_disp:
     DEC Y
     TSTZ Y
     JMPF SIMULATIE_STAP
-
-END_MATRIX:
-    SYNC END_MATRIX
+; --- Start hygiënische macro: waitMatrix (ID: 3) ---
+__M3__waitMatrix:
+    SYNC __M3__waitMatrix
+; --- Einde macro: waitMatrix ---
     HALT
 
 DISPLAY_WORKER:

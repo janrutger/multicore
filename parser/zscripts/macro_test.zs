@@ -10,12 +10,20 @@ MAP {
         TSTZ REG 
         JMPT LUS
     }
+
+    MACRO LEEG(){
+        10 -> A
+        5 -> B
+        ADD A B
+    }
 }
 PROGRAM {
     main:
 
     WAITING(A, 10)
     WAITING(B, 20)  
+
+    LEEG()
 
     HALT
 }
