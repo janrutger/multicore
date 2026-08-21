@@ -47,6 +47,7 @@ class Op(IntEnum):
     JOIN    = 28      # Implemented
 
     SHIFTL   = 43      # Implemented
+    SHIFTR   = 46      # Implemented
     ROTL32   = 44      # Implemented
     SM32_RND = 45      # Implemented
 
@@ -56,6 +57,7 @@ class Op(IntEnum):
     SUB   = 52
     MUL   = 60      # Implemented
     MOD   = 65      # Implemented
+    DIV   = 66
     TSTE  = 71      # Implemented
     TSTG  = 72      # Implemented
 
@@ -76,10 +78,10 @@ class Op(IntEnum):
 FORMAT_ZERO        = {Op.NOP, Op.HALT, Op.CLOSE, Op.IOSYNC, Op.AUTOCLOSE}
 FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.SUCCES, Op.FAIL, Op.SYNC}
 FORMAT_ONE_REG     = {Op.INC, Op.DEC, Op.TSTZ}
-FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.TSTE, Op.TSTG, Op.XOR}
+FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.DIV, Op.TSTE, Op.TSTG, Op.XOR}
 FORMAT_TWO_REG_VAL = {
     Op.LDI, Op.LDM, Op.LDX, Op.OUT, Op.IN, Op.STO, Op.STX, 
-    Op.SHIFTL, Op.ROTL32, Op.SM32_RND, Op.CONTEXT, Op.JOIN, 
+    Op.SHIFTL, Op.SHIFTR, Op.ROTL32, Op.SM32_RND, Op.CONTEXT, Op.JOIN, 
     Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI
 }
 
@@ -127,6 +129,7 @@ MICROCODE_ROM = {
 
     'xor_vw': ['valid_v', 'valid_w', 'xor_vw',   'setResult'],
     'shftl':  ['valid_v', 'mv_tw',   'shftl_vw', 'setResult'],
+    'shftr':  ['valid_v', 'abs_v',   'mv_tw',    'shftr_vw',   'setResult'],
     'rol32':  ['valid_v', 'mv_tw',   'rol32_vw', 'setResult'],
 
     'addi':   ['valid_v', 'mv_tw', 'add', 'setResult'],

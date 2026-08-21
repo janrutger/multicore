@@ -215,9 +215,13 @@ class Ucore:
             self.value = self.value ^ self.work
             self.upc += 1
 
-        elif uinstruction == 'shftl_vw':        # shift V, W times
+        elif uinstruction == 'shftl_vw':        # shift left V, W times
             self.value = self.value << self.work
             self.upc += 1
+
+        elif uinstruction == 'shftr_vw':        # shift right V, W times
+                    self.value = self.value >> self.work
+                    self.upc += 1
 
         elif uinstruction == 'rol32_vw':
             shift = self.work

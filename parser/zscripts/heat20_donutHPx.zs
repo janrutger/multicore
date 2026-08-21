@@ -15,7 +15,7 @@ MAP {
     CONST GRID_SIZE 399     ; Laatste cel-index (400 cellen: 0 t/m 399)
     CONST LAST_COL 19       ; Rechterrand kolom-index
     CONST BOTTOM_START 380  ; Start-index van de onderste rij (19 * 20)
-    CONST HEAT_SOURCE 210   ; Permanente warmtebron in het centrum
+    CONST HEAT_SOURCE 350   ; Permanente warmtebron in het centrum 210, 350
 
     ; De 4 hoekpunten als koude-sinks (temperatuur 0)
     CONST CORNER_TL 0       ; Boven-Links
@@ -125,7 +125,7 @@ main:
     ; ==========================================================
     ;  HOOFD SIMULATIE LUS (150 diffusie-stappen)
     ; ==========================================================
-    75 -> A                 ; Simulatierondes
+    150 -> A                 ; Simulatierondes
     A -> [itterations]
 
 SIMULATIE_STAP:

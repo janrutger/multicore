@@ -190,6 +190,18 @@ def _execute_cycleZ32(master_cpu, target):
             target.registers[reg1] = core_id
             target.last_active_core = core_id
 
+        elif opcode == Op.DIV:
+            if not master_cpu.free_cores: return # Stall
+            core_id = master_cpu.free_cores.popleft()
+            
+            src1_core = target.registers[reg1]
+            src2_core = target.registers[arg2] 
+            
+            master_cpu.cores[core_id].dispatch('div', arg1=src1_core, arg2=src2_core)
+            target.registers[reg1] = core_id
+            target.last_active_core = core_id
+
+
         elif opcode == Op.ADDI:
             if not master_cpu.free_cores: return # Stall
             core_id = master_cpu.free_cores.popleft()
@@ -284,6 +296,17 @@ def _execute_cycleZ32(master_cpu, target):
             master_cpu.cores[core_id].transfer = arg2
 
             master_cpu.cores[core_id].dispatch('shftl', arg1=src1_core, arg2=None)
+            target.registers[reg1] = core_id
+            target.last_active_core = core_id
+
+        elif opcode == Op.SHIFTR:
+            if not master_cpu.free_cores: return # Stall
+            core_id = master_cpu.free_cores.popleft()
+
+            src1_core = target.registers[reg1]
+            master_cpu.cores[core_id].transfer = arg2
+
+            master_cpu.cores[core_id].dispatch('shftr', arg1=src1_core, arg2=None)
             target.registers[reg1] = core_id
             target.last_active_core = core_id
 
