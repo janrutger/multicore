@@ -1,9 +1,9 @@
-# Inmos_Z32G.py 
+# Inmos_Z32A.py 
 # Start of the new Context based parrallel CPU
 
 from collections import deque
-from memory import Memory
-# from memoryMMU import MMU as Memory
+# from memory import Memory
+from memoryMMU import MMU as Memory
 from ucore  import Ucore
 
 from ExecuterZ32G import _execute_cycleZ32 
@@ -14,7 +14,8 @@ from opcodes import Op, FORMAT_ZERO, FORMAT_ONE_ADDR, FORMAT_ONE_REG, FORMAT_TWO
 
 class CPU:
     def __init__(self):
-        self.memory = Memory(size=1024)
+        # self.memory = Memory(size=1024)
+        self.memory = Memory(Page0=1024, Private=512, Shared=1024, block_size=64)
 
         self._execute_cycle = _execute_cycleZ32
 
