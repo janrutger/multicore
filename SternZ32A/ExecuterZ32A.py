@@ -143,7 +143,7 @@ def _execute_cycleZ32(master_cpu, target):
             if not master_cpu.free_cores: return # Stall
             core_id = master_cpu.free_cores.popleft()
             
-            mem_value = master_cpu.memory.memRead(arg2)
+            mem_value = master_cpu.memory.memRead(arg2, master_cpu.ID)
             
             master_cpu.cores[core_id].transfer = mem_value
             master_cpu.cores[core_id].dispatch('ldv') 
@@ -159,7 +159,7 @@ def _execute_cycleZ32(master_cpu, target):
                 core_id = master_cpu.free_cores.popleft()     
 
                 effective_addr = arg2 + master_cpu.cores[index_core].value
-                ram_value = master_cpu.memory.memRead(effective_addr)
+                ram_value = master_cpu.memory.memRead(effective_addr, master_cpu.ID)
                 
                 master_cpu.cores[core_id].transfer = ram_value
                 master_cpu.cores[core_id].dispatch('ldv') 
@@ -377,33 +377,69 @@ def _execute_cycleZ32(master_cpu, target):
             target.fsm_state = 'HALT'
             return
         
+        # elif opcode == Op.STO:
+        #     core_id = target.registers[reg1]
+            
+        #     if core_id is None:
+        #         raise RuntimeError(
+        #             f"Hardware Fault: STO op PC={target.PC-1} (MIR={target.MIR}). "
+        #             f"Register {reg1} heeft geen actieve Core-ID!"
+        #         )
+            
+        #     if master_cpu.cores[core_id].coreStatus != 'VALID':
+        #         return # Stall
+            
+        #     value_to_store = master_cpu.cores[core_id].value
+        #     master_cpu.memory.memWrite(value_to_store, adres=arg2)
+
+        # elif opcode == Op.STX:
+        #     index_core = target.registers[0]         
+        #     data_core = target.registers[reg1]       
+            
+        #     if (index_core is not None and master_cpu.cores[index_core].coreStatus == 'VALID' and
+        #         data_core is not None and master_cpu.cores[data_core].coreStatus == 'VALID'):
+                
+        #         effective_addr = arg2 + master_cpu.cores[index_core].value
+        #         val_to_store = master_cpu.cores[data_core].value
+        #         master_cpu.memory.memWrite(val_to_store, adres=effective_addr)
+        #     else:
+        #         return  # Stall
+
         elif opcode == Op.STO:
             core_id = target.registers[reg1]
-            
+
             if core_id is None:
                 raise RuntimeError(
                     f"Hardware Fault: STO op PC={target.PC-1} (MIR={target.MIR}). "
                     f"Register {reg1} heeft geen actieve Core-ID!"
                 )
-            
+
             if master_cpu.cores[core_id].coreStatus != 'VALID':
-                return # Stall
-            
+                return # Stall (wacht tot bron-core VALID is)
+
             value_to_store = master_cpu.cores[core_id].value
-            master_cpu.memory.memWrite(value_to_store, adres=arg2)
+
+            # Schrijf naar MMU met ID en controleer op bus-stall
+            status = master_cpu.memory.memWrite(value_to_store, adres=arg2, cpu_id=master_cpu.ID)
+            if status == "STALL":
+                return # Bus bezet door andere CPU: probeer volgende cyclus opnieuw
 
         elif opcode == Op.STX:
-            index_core = target.registers[0]         
-            data_core = target.registers[reg1]       
-            
+            index_core = target.registers[0]
+            data_core = target.registers[reg1]
+
             if (index_core is not None and master_cpu.cores[index_core].coreStatus == 'VALID' and
                 data_core is not None and master_cpu.cores[data_core].coreStatus == 'VALID'):
-                
+
                 effective_addr = arg2 + master_cpu.cores[index_core].value
                 val_to_store = master_cpu.cores[data_core].value
-                master_cpu.memory.memWrite(val_to_store, adres=effective_addr)
+
+                # Schrijf naar MMU met ID en controleer op bus-stall
+                status = master_cpu.memory.memWrite(val_to_store, adres=effective_addr, cpu_id=master_cpu.ID)
+                if status == "STALL":
+                    return # Bus bezet door andere CPU: probeer volgende cyclus opnieuw
             else:
-                return  # Stall
+                return  # Stall (wacht tot index en data cores beide VALID zijn)
 
         elif opcode == Op.JMP:
             target.PC = arg2
@@ -540,33 +576,6 @@ def _execute_cycleZ32(master_cpu, target):
                 master_cpu.contexts.remove(target)
                 
             return
-
-        # elif opcode == Op.RETURN:
-        #     if target == master_cpu:
-        #         raise RuntimeError("Hardware Fault: De master-CPU mag CLOSE niet aanroepen!")
-            
-        #     # We lopen door de registers van de context en contoleren of alles IDLE (context is echt klaar) is
-        #     for reg_val in target.registers.values():
-        #         if reg_val is not None:  # Dit is een Core-ID wijzer naar ons (eind)resultaat
-        #             assigned_core = master_cpu.cores[reg_val]
-        #             if assigned_core.coreStatus == 'WORKING':
-        #                 # De keten is nog niet klaar! Dwing de thread om te wachten.
-        #                 target.fsm_state = 'EXECUTE'
-        #                 return 
-        #     # Pas als álle cores in de registers van de thread de status 'VALID' hebben,
-        #     # is de berekening gegarandeerd voltooid en kan de Master veilig JOINEN.
-        #     target.fsm_state = 'DONE'
-
-
-        #     # SCHOONMAAKWERK: Zet alle overige uCores van deze thread-context op IDLE
-        #     for reg_idx, core_id in target.registers.items():
-        #         if core_id is not None:
-        #             if reg_idx == reg1:
-        #                 continue
-        #             master_cpu.cores[core_id].coreStatus = 'IDLE'
-
-        #     return
-            
 
 
         elif opcode == Op.JOIN:

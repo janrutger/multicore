@@ -3,19 +3,27 @@
 
 from collections import deque
 # from memory import Memory
-from memoryMMU import MMU as Memory
+from memoryMMU import MMU 
 from ucore  import Ucore
 
-from ExecuterZ32G import _execute_cycleZ32 
+from ExecuterZ32A import _execute_cycleZ32 
 
 
 # Importeer de STERN-boekhouding uit het andere bestand
 from opcodes import Op, FORMAT_ZERO, FORMAT_ONE_ADDR, FORMAT_ONE_REG, FORMAT_TWO_REG_REG, FORMAT_TWO_REG_VAL
 
 class CPU:
-    def __init__(self):
+    def __init__(self, cpu_id=0, memory=None):
         # self.memory = Memory(size=1024)
-        self.memory = Memory(Page0=1024, Private=512, Shared=1024, block_size=64)
+        # self.memory = Memory(Page0=1024, Private=512, Shared=1024, block_size=64)
+        self.ID = cpu_id
+        # Als er geen MMU wordt meegegeven, maken we een stand-alone instantie aan.
+        # Als er wél een MMU wordt meegegeven (zoals door het Mainboard), gebruiken we die!
+        self.memory = (
+            memory
+            if memory is not None
+            else MMU(Page0=1024, Private=512, Shared=1024, block_size=64)
+        )
 
         self._execute_cycle = _execute_cycleZ32
 
