@@ -2,6 +2,7 @@
 # Start of the new Context based parrallel CPU
 
 from collections import deque
+from CIUcontroller import CIU  # <-- 1. IMPORT CIU CONTROLLER
 # from memory import Memory
 from memoryMMU import MMU 
 from ucore  import Ucore
@@ -25,6 +26,17 @@ class CPU:
             else MMU(Page0=1024, Private=512, Shared=1024, block_size=64)
         )
 
+        # --- CIU INTEGRATIE (ON-CHIP SILICON) ---
+        self.ciu = CIU(self)  # <-- 2. KOOPPEL CIU AAN DEZE CPU
+
+        # --- HARDWARE RESET STATE ---
+        if self.ID == 0:
+            self.fsm_state = "FETCH"  # Master start direct met de main-loop
+        else:
+            self.fsm_state = (
+                "WAIT_FOR_WORK"  # Worker CPU's staan stil tot een CIU-signaal
+            )
+
         self._execute_cycle = _execute_cycleZ32
 
         # Stap 1: Maak alle cores onafhankelijk aan
@@ -46,7 +58,7 @@ class CPU:
         self.contexts = []                     # <-- De order-safe lijst voor actieve threads
         self.current_context_index = 0         # <-- Start de round-robin pointer op index 0
 
-        self.fsm_state = 'FETCH'             # FETCH, DECODE, EXECUTE
+        # self.fsm_state = 'FETCH'             # FETCH, DECODE, EXECUTE
         self.MIR       = None                # Memory Instruction Register (onze huidige integer)
 
         # Tijdelijk gedecodede variabelen die we bewaren tussen de ticks door
@@ -117,6 +129,15 @@ class CPU:
                     self.current_context_index = 0
                     
                 target_context = active_running_contexts[self.current_context_index]
+
+                # # --- DEBUG PRINT: TOON EXECUTIE VAN CONTEXT OP CPU ---
+                # print(
+                #     f"\033[36m[CTX TICK CPU{self.ID}] Thread"
+                #     f" #{self.current_context_index + 1}/{len(active_running_contexts)}"
+                #     f" | State: {target_context.fsm_state:<7} | PC:"
+                #     f" {target_context.PC:<3}\033[0m"
+                # )
+
                 
                 # --- JOUW ELEGANTE LOGICA ---
                 if target_context.fsm_state == 'FETCH':
@@ -131,21 +152,30 @@ class CPU:
                 self.current_context_index = (self.current_context_index + 1) % len(active_running_contexts)
 
 
+            # Als de CPU in WAIT_FOR_WORK staat, doet de klok cyclus niks
+            if self.fsm_state == "WAIT_FOR_WORK":
+                return
+
             # 3. Voer DAARNA de huidige hoofd-CPU instructie uit
             self._execute_cycle(self, self)
 
 
 
     def is_completely_idle(self):
-        """Controleert of de CPU op HALT staat én alle cores klaar zijn met rekenen."""
-        if self.fsm_state != 'HALT':
+        """Controleert of de CPU volledig in rust is."""
+        # 1. Als er nog actieve hardware-threads in de lijst zitten, zijn we NIET idle!
+        if len(self.contexts) > 0:
             return False
-            
-        # Check of er nog ergens een core aan het werk is
+
+        # 2. Als de hoofd-pijplijn nog draait (niet op HALT of WAIT_FOR_WORK), zijn we NIET idle!
+        if self.fsm_state not in ["HALT", "WAIT_FOR_WORK"]:
+            return False
+
+        # 3. Als er nog minstens 1 micro-core aan het rekenen is, zijn we NIET idle!
         for core in self.cores:
-            if core.coreStatus == 'WORKING':
+            if core.coreStatus == "WORKING":
                 return False
-                
-        # Als de CPU op HALT staat en geen enkele core is WORKING, zijn we klaar!
+
+        # Pas als er GEEN contexts zijn, FSM in rust is én alle cores stilstaan, zijn we idle!
         return True
 

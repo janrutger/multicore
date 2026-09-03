@@ -529,6 +529,60 @@ def _execute_cycleZ32(master_cpu, target):
             # print(f"\033[38;2;0;255;50m[SPAWN] 🚀 Context #{ctx_id:02d} aangemaakt | Matrix pool: {cores_over} cores vrij\033[0m")
             # # =================================
 
+        elif opcode == Op.RCONTEXT:
+            # RCONTEXT arg_reg, task_pc
+            # 1. Evalueer de data-waarde van het argument-register op DEZE CPU
+            arg_reg = reg1
+            arg_val = (
+                master_cpu.cores[target.registers[reg1]].value
+                if target.registers[reg1] is not None
+                else 0
+            )
+            task_pc = arg2
+
+            # 2. CIU stelt het instructie-pakket samen en scant de aangesloten poorten
+            ack = master_cpu.ciu.request_remote_context(
+                task_pc, arg_reg, arg_val
+            )
+
+            if ack:
+                master_cpu.status = (
+                    1  # SUCCESS: Taak geaccepteerd door een buur!
+                )
+            else:
+                master_cpu.status = (
+                    0  # FAIL (NACK): Alle buren vol of niet aangesloten!
+                )
+
+            # NIET STALLEN! Ga direct door naar de opvang-instructie (FAIL _count)
+            target.fsm_state = "FETCH"
+
+        elif opcode == Op.ALLSYNC:
+            # Check 1: Draaien er lokaal nog actieve contexts of cores?
+            lokale_activiteit = len(master_cpu.contexts) > 0
+
+            # Check 2: Vraag via de CIU of er op buur-CPU's nog activiteit is
+            remote_activiteit = not master_cpu.ciu.are_all_neighbors_idle()
+
+            if lokale_activiteit or remote_activiteit:
+                # Er is nog activiteit in het cluster! Spring terug naar het label (arg2)
+                target.PC = arg2
+                master_cpu.status = 0
+            else:
+                # Het gehele cluster (lokaal + remote) is 100% klaar!
+                master_cpu.status = 1
+                target.fsm_state = (
+                    'FETCH'  # Stroom geruisloos door naar de volgende regel
+                )
+
+        elif opcode == Op.BOOT_REMOTE:
+            # BOOT_REMOTE link_id, start_pc
+            link_id = reg1
+            start_pc = arg2
+            master_cpu.ciu.send_boot_remote(link_id, start_pc)
+            target.PC += 1
+            target.fsm_state = "FETCH"
+
         elif opcode == Op.CLOSE:
             if target == master_cpu:
                 raise RuntimeError("Hardware Fault: De master-CPU mag CLOSE niet aanroepen!")

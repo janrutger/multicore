@@ -1,6 +1,7 @@
 MAP {
     MEMSIZE 2560
     START main
+    RES notused 513
 
     RES failcount 1
 
@@ -34,7 +35,7 @@ MAP {
 
     MACRO waitMatrix() {
         _waitMatrix:
-        SYNC _waitMatrix
+        ALLSYNC _waitMatrix
     }
 
     ; ==========================================================
@@ -42,7 +43,7 @@ MAP {
     ; ==========================================================
     MACRO startTask(task, arg){
         _spawntask:
-            CONTEXT arg task
+            RCONTEXT arg task
             FAIL _count
             JMP _spawnd
 

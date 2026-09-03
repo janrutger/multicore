@@ -22,9 +22,10 @@ class Op(IntEnum):
     # CALLX = 25
     # INT   = 26
 
-    SUCCES = 16      # Implemented
-    FAIL   = 17      # Implemented
-    SYNC   = 18      # Implemented
+    SUCCES  = 16      # Implemented
+    FAIL    = 17      # Implemented
+    SYNC    = 18      # Implemented
+    ALLSYNC = 19      # Cluster-brede Barrier Sync
 
     # --- FORMAT: TWO_REG_VAL / TWO_REG_ADDR --- 
     LDI   = 31      # Implemented
@@ -45,6 +46,8 @@ class Op(IntEnum):
 
     CONTEXT = 27      # Implemented
     JOIN    = 28      # Implemented
+    RCONTEXT    = 36  # Remote Context Injection via CIU
+    BOOT_REMOTE = 37  # Remote CPU Boot via CIU
 
     SHIFTL   = 43      # Implemented
     SHIFTR   = 46      # Implemented
@@ -71,18 +74,18 @@ class Op(IntEnum):
     # CALLS = 95
     INC   = 80     # Implemented
     DEC   = 81     # Implemented
-    # RETURN= 19     # Niet langer ondersteund
     TSTZ  = 73     # Implemented
 
 # Vaste sets voor de decoder om snel het format te matchen
 FORMAT_ZERO        = {Op.NOP, Op.HALT, Op.CLOSE, Op.IOSYNC, Op.AUTOCLOSE}
-FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.SUCCES, Op.FAIL, Op.SYNC}
+FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.SUCCES, Op.FAIL, Op.SYNC, Op.ALLSYNC,}
 FORMAT_ONE_REG     = {Op.INC, Op.DEC, Op.TSTZ}
 FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.DIV, Op.TSTE, Op.TSTG, Op.XOR}
 FORMAT_TWO_REG_VAL = {
     Op.LDI, Op.LDM, Op.LDX, Op.OUT, Op.IN, Op.STO, Op.STX, 
     Op.SHIFTL, Op.SHIFTR, Op.ROTL32, Op.SM32_RND, Op.CONTEXT, Op.JOIN, 
-    Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI
+    Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI, Op.RCONTEXT,
+    Op.BOOT_REMOTE,  
 }
 
 
