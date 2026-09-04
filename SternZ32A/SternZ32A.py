@@ -40,7 +40,9 @@ class SternZ32Mainboard:
 
         # 2. Trek direct een ChannelLink tussen CPU0 (poort 0) en CPU1 (poort 0)
         ChannelLink(self.cpus[0].ciu, 0, self.cpus[1].ciu, 0) 
-        ChannelLink(self.cpus[0].ciu, 1, self.cpus[2].ciu, 0)   
+        ChannelLink(self.cpus[0].ciu, 1, self.cpus[2].ciu, 0)
+        ChannelLink(self.cpus[0].ciu, 2, self.cpus[3].ciu, 0) 
+        ChannelLink(self.cpus[0].ciu, 3, self.cpus[4].ciu, 0)   
 
         # =========================================================================
         # --- DEBUG ROUTINE: TOON CIU TOPOLOGIE EN AFBREKEN ---

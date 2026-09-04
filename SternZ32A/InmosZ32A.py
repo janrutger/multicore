@@ -130,7 +130,7 @@ class CPU:
                     
                 target_context = active_running_contexts[self.current_context_index]
 
-                # # --- DEBUG PRINT: TOON EXECUTIE VAN CONTEXT OP CPU ---
+                # --- DEBUG PRINT: TOON EXECUTIE VAN CONTEXT OP CPU ---
                 # print(
                 #     f"\033[36m[CTX TICK CPU{self.ID}] Thread"
                 #     f" #{self.current_context_index + 1}/{len(active_running_contexts)}"

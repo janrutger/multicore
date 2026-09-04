@@ -12,22 +12,22 @@ main:
     LDI I, 399
 ; --- REPEAT LOOP START ---
 __REP_START_2:
-    STX A, 1646
-    STX A, 1246
+    STX A, 2159
+    STX A, 1759
     DEC I
     TSTZ I
     JMPF __REP_START_2
 ; --- REPEAT LOOP END ---
     LDI A, 70
     LDI I, 350
-    STX A, 1646
+    STX A, 2159
     LDI A, 150
-    STO A, 1244
+    STO A, 1757
 
 SIMULATIE_STAP:
     LDI X, 0
     LDI A, 0
-    STO A, 1245
+    STO A, 1758
     LDI B, 400
 ; --- REPEAT LOOP START ---
 __REP_START_3:
@@ -37,10 +37,10 @@ __M1__spawntask:
     FAIL __M1__count
     JMP __M1__spawnd
 __M1__count:
-    LDM A, 2046
+    LDM A, 2559
     INC A
-    STO A, 2046
-    LDM I, 1245
+    STO A, 2559
+    LDM I, 1758
     LDI B, 400
 ; --- IF STATEMENT START (ID: 0) ---
     TSTE I, B
@@ -51,9 +51,9 @@ __M1___IF_END_0:
 ; --- IF STATEMENT END ---
     LD A, I
     LD I, A
-    LDX A, 1646
+    LDX A, 2159
     INC I
-    STO I, 1245
+    STO I, 1758
     DEC I
 ; --- IF STATEMENT START (ID: 1) ---
     TSTZ A
@@ -86,13 +86,13 @@ __M1__spawnd:
 __M2__waitMatrix:
     ALLSYNC __M2__waitMatrix
 ; --- Einde macro: waitMatrix ---
-    LDM I, 1245
+    LDM I, 1758
     LDI B, 400
 ; --- REPEAT LOOP START ---
 __REP_START_5:
     LD A, I
     LD I, A
-    LDX A, 1646
+    LDX A, 2159
 ; --- IF STATEMENT START (ID: 4) ---
     TSTZ A
     JMPT __IF_END_4
@@ -121,15 +121,15 @@ __IF_END_4:
     LDI I, 399
 ; --- REPEAT LOOP START ---
 __REP_START_6:
-    LDX A, 1246
-    STX A, 1646
+    LDX A, 1759
+    STX A, 2159
     DEC I
     TSTZ I
     JMPF __REP_START_6
 ; --- REPEAT LOOP END ---
-    LDM A, 1244
+    LDM A, 1757
     DEC A
-    STO A, 1244
+    STO A, 1757
     TSTZ A
     JMPF SIMULATIE_STAP
 ; --- Start hygiënische macro: waitMatrix (ID: 3) ---
@@ -149,7 +149,7 @@ HEAT_WORKER:
     JMPF __IF_END_7
     LDI A, 0
     LD I, X
-    STX A, 1246
+    STX A, 1759
     AUTOCLOSE
 __IF_END_7:
 ; --- IF STATEMENT END ---
@@ -159,7 +159,7 @@ __IF_END_7:
     JMPF __IF_END_8
     LDI A, 0
     LD I, X
-    STX A, 1246
+    STX A, 1759
     AUTOCLOSE
 __IF_END_8:
 ; --- IF STATEMENT END ---
@@ -169,7 +169,7 @@ __IF_END_8:
     JMPF __IF_END_9
     LDI A, 0
     LD I, X
-    STX A, 1246
+    STX A, 1759
     AUTOCLOSE
 __IF_END_9:
 ; --- IF STATEMENT END ---
@@ -179,7 +179,7 @@ __IF_END_9:
     JMPF __IF_END_10
     LDI A, 0
     LD I, X
-    STX A, 1246
+    STX A, 1759
     AUTOCLOSE
 __IF_END_10:
 ; --- IF STATEMENT END ---
@@ -189,7 +189,7 @@ __IF_END_10:
     JMPF __IF_END_11
     LDI A, 70
     LD I, X
-    STX A, 1246
+    STX A, 1759
     AUTOCLOSE
 __IF_END_11:
 ; --- IF STATEMENT END ---
@@ -203,7 +203,7 @@ __IF_END_11:
 __IF_END_12:
 ; --- IF STATEMENT END ---
     LD I, A
-    LDX A, 1646
+    LDX A, 2159
     LD B, X
     ADDI B, 20
     LDI M, 380
@@ -215,7 +215,7 @@ __IF_END_12:
 __IF_END_13:
 ; --- IF STATEMENT END ---
     LD I, B
-    LDX B, 1646
+    LDX B, 2159
     ADD A, B
     LD M, X
     LDI B, 20
@@ -229,7 +229,7 @@ __IF_END_13:
 __IF_END_14:
 ; --- IF STATEMENT END ---
     LD I, B
-    LDX B, 1646
+    LDX B, 2159
     ADD A, B
     LD M, X
     LDI B, 20
@@ -244,10 +244,10 @@ __IF_END_14:
 __IF_END_15:
 ; --- IF STATEMENT END ---
     LD I, B
-    LDX B, 1646
+    LDX B, 2159
     ADD A, B
     ADDI A, 3
     DIVI A, 4
     LD I, X
-    STX A, 1246
+    STX A, 1759
     AUTOCLOSE

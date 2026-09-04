@@ -40,7 +40,7 @@ class CIU:
     def __init__(self, cpu):
         self.cpu = cpu
         self.links = [None, None, None, None]  # Poorten: Link 0, 1, 2, 3
-
+        
     # =========================================================================
     # ZENDER-ZIJDE (Requests versturen)
     # =========================================================================
@@ -54,6 +54,7 @@ class CIU:
         packet = (CMD_CONTEXT, arg_reg, arg_val, task_pc)
 
         for link in self.links:
+        
             if link is None:
                 continue
 
@@ -66,9 +67,9 @@ class CIU:
             if ack:
                 # print(f"[CIU CPU{self.cpu.ID}] ACK ontvangen! Remote context injected.")
                 return True
-            else:
-                # print(f"[CIU CPU{self.cpu.ID}] NACK ontvangen van alle buren.")
-                return False
+            # else:     # Als deze buur NACK geeft, loopt de for-lus gewoon door naar de volgende link!
+            #     # print(f"[CIU CPU{self.cpu.ID}] NACK ontvangen van alle buren.")
+            #     return False
 
         return False  # NACK: Geen aangesloten buren of alle buren zitten vol
 
