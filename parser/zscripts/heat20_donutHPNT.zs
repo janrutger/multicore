@@ -44,13 +44,15 @@ MAP {
     MACRO startTask(task, arg){
         _spawntask:
             RCONTEXT arg task
-            FAIL _local
-            JMP _spawnd
+            SUCCES _spawnd
+            ; FAIL _local
+            ; JMP _spawnd
 
         _local:
             CONTEXT arg task
-            FAIL _count
-            JMP _spawnd
+            SUCCES _spawnd
+            ; FAIL _count
+            ; JMP _spawnd
 
         _count:
             ; INC K                   ; Unieke FAIL-teller bijhouden

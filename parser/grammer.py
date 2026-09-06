@@ -61,7 +61,7 @@ REGISTER.2: /\\b(A|B|C|D|K|L|M|X|Y|Z|I)\\b/
 COMPARATOR.2: "==" | ">"
 IDENTIFIER.1: /[a-zA-Z_][a-zA-Z0-9_\\-]*/
 
-%import common.INT
+%import common.SIGNED_INT -> INT
 %import common.NEWLINE
 _NL: NEWLINE
 COMMENT: ";" /[^\\r\\n]*/

@@ -2,64 +2,110 @@
 # Importeer de STERN-boekhouding uit het andere bestand
 from opcodes import Op, FORMAT_ZERO, FORMAT_ONE_ADDR, FORMAT_ONE_REG, FORMAT_TWO_REG_REG, FORMAT_TWO_REG_VAL
 
+# class HardwareContext:
+#     def __init__(self, master_cpu, source_reg):
+#         """
+#         Representeert een hardware-thread (context) binnen de Inmos-Z32.
+#         Alloceert direct een vrije ucore vanuit de CPU free_cores pool.
+#         """
+#         self.memory = master_cpu.memory
+#         self.cores = master_cpu.cores
+        
+#         # Elke context heeft een eigen, onafhankelijke registerfile
+#         self.registers = {i: None for i in range(10)}
+        
+#         # 1. Haal de bronwaarde op uit de hoofd-CPU
+#         source_core_id = master_cpu.registers[source_reg]
+#         if source_core_id is None:
+#             raise RuntimeError(f"Hardware Fault: Register {source_reg} bevat geen geldige ucore-wijzer!")
+#         source_value = master_cpu.cores[source_core_id].value
+        
+#         # 2. MATCH MET JOUW LOGICA: Check de pool en pop een vrije core
+#         if not master_cpu.free_cores:
+#             # Als er geen cores vrij zijn, zetten we de cpu_status op 0 (Fail)
+#             master_cpu.status = 0
+#             # We gooien een specifieke status zodat de CONTEXT-instructie weet dat hij moet stallen/afbreken
+#             # raise RuntimeError("Hardware Stall: Geen vrije ucores beschikbaar in de pool!")
+        
+#         else:
+#             # Succes! Pop de core direct uit de pool van de hoofd-CPU
+#             allocated_core_id = master_cpu.free_cores.popleft()
+#             master_cpu.status = 1  # Signaleer succes naar het cpu.status registe
+        
+#             target_core = master_cpu.cores[allocated_core_id]
+            
+#             # 3. Initialiseer de hardware-toestand van deze unieke core conform ucore.py
+#             target_core.value = source_value
+#             target_core.coreStatus = 'VALID'  # Correct voor de state van de core
+#             target_core.upc = 0               # Reset microcode program counter
+#             target_core.status = True         # De interne status-vlag (ALU/Branch conditie)
+            
+#             # Maak de overige ALU-registers leeg voor de nieuwe thread
+#             target_core.work = 0              # W-register reset
+#             target_core.transfer = 0          # T-register reset
+            
+#             # Eventuele hardware-latches voor het teken (+/-) resetten
+#             target_core.sign_v = 0
+#             target_core.sign_w = 0
+
+#             # Wijs deze exclusieve core toe aan het lokale register van de context
+#             self.registers[source_reg] = allocated_core_id
+
+#             # Context Executie Boekhouding
+#             self.fsm_state = 'FETCH'
+#             self.MIR = None
+#             self.PC = 0  # Wordt gevuld met het jumpadres door de CONTEXT instructie
+
+#             self.decoded_opcode = 0
+#             self.decoded_reg1 = 0
+#             self.decoded_arg2 = 0
+
+#             self.last_active_core = allocated_core_id
+#             self.last_test_core = None
 class HardwareContext:
-    def __init__(self, master_cpu, source_reg):
-        """
-        Representeert een hardware-thread (context) binnen de Inmos-Z32.
-        Alloceert direct een vrije ucore vanuit de CPU free_cores pool.
-        """
+
+    def __init__(self, master_cpu, source_reg, direct_value=None):
         self.memory = master_cpu.memory
         self.cores = master_cpu.cores
-        
-        # Elke context heeft een eigen, onafhankelijke registerfile
         self.registers = {i: None for i in range(10)}
-        
-        # 1. Haal de bronwaarde op uit de hoofd-CPU
-        source_core_id = master_cpu.registers[source_reg]
-        if source_core_id is None:
-            raise RuntimeError(f"Hardware Fault: Register {source_reg} bevat geen geldige ucore-wijzer!")
-        source_value = master_cpu.cores[source_core_id].value
-        
-        # 2. MATCH MET JOUW LOGICA: Check de pool en pop een vrije core
-        if not master_cpu.free_cores:
-            # Als er geen cores vrij zijn, zetten we de cpu_status op 0 (Fail)
-            master_cpu.status = 0
-            # We gooien een specifieke status zodat de CONTEXT-instructie weet dat hij moet stallen/afbreken
-            # raise RuntimeError("Hardware Stall: Geen vrije ucores beschikbaar in de pool!")
-        
+
+        # Als er een direct_value is meegegeven (via CIU RCONTEXT), gebruiken we die!
+        if direct_value is not None:
+            source_value = direct_value
         else:
-            # Succes! Pop de core direct uit de pool van de hoofd-CPU
+            # Anders lezen we de waarde traditioneel uit het hoofdregister van de CPU
+            source_core_id = master_cpu.registers[source_reg]
+            if source_core_id is None:
+                raise RuntimeError(
+                    f"Hardware Fault: Register {source_reg} bevat geen geldige"
+                    " ucore-wijzer!"
+                )
+            source_value = master_cpu.cores[source_core_id].value
+
+        if not master_cpu.free_cores:
+            master_cpu.status = 0
+        else:
             allocated_core_id = master_cpu.free_cores.popleft()
-            master_cpu.status = 1  # Signaleer succes naar het cpu.status registe
-        
+            master_cpu.status = 1
+
             target_core = master_cpu.cores[allocated_core_id]
-            
-            # 3. Initialiseer de hardware-toestand van deze unieke core conform ucore.py
             target_core.value = source_value
-            target_core.coreStatus = 'VALID'  # Correct voor de state van de core
-            target_core.upc = 0               # Reset microcode program counter
-            target_core.status = True         # De interne status-vlag (ALU/Branch conditie)
-            
-            # Maak de overige ALU-registers leeg voor de nieuwe thread
-            target_core.work = 0              # W-register reset
-            target_core.transfer = 0          # T-register reset
-            
-            # Eventuele hardware-latches voor het teken (+/-) resetten
+            target_core.coreStatus = "VALID"
+            target_core.upc = 0
+            target_core.status = True
+            target_core.work = 0
+            target_core.transfer = 0
             target_core.sign_v = 0
             target_core.sign_w = 0
 
-            # Wijs deze exclusieve core toe aan het lokale register van de context
             self.registers[source_reg] = allocated_core_id
 
-            # Context Executie Boekhouding
-            self.fsm_state = 'FETCH'
+            self.fsm_state = "FETCH"
             self.MIR = None
-            self.PC = 0  # Wordt gevuld met het jumpadres door de CONTEXT instructie
-
+            self.PC = 0
             self.decoded_opcode = 0
             self.decoded_reg1 = 0
             self.decoded_arg2 = 0
-
             self.last_active_core = allocated_core_id
             self.last_test_core = None
 
@@ -176,6 +222,17 @@ def _execute_cycleZ32(master_cpu, target):
             src2_core = target.registers[arg2] 
             
             master_cpu.cores[core_id].dispatch('add', arg1=src1_core, arg2=src2_core)
+            target.registers[reg1] = core_id
+            target.last_active_core = core_id    
+
+        elif opcode == Op.SUB:
+            if not master_cpu.free_cores: return # Stall
+            core_id = master_cpu.free_cores.popleft()
+            
+            src1_core = target.registers[reg1]
+            src2_core = target.registers[arg2] 
+            
+            master_cpu.cores[core_id].dispatch('sub', arg1=src1_core, arg2=src2_core)
             target.registers[reg1] = core_id
             target.last_active_core = core_id         
             

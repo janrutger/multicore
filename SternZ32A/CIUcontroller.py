@@ -1,5 +1,7 @@
 # CIUcontroller.py
 
+from ExecuterZ32A import HardwareContext
+
 # --- CIU PACKET OPCODES ---
 CMD_CONTEXT = 1  # Remote Context Injection (RCONTEXT)
 CMD_BOOT = 2  # Remote CPU Boot / Wakeup
@@ -104,47 +106,79 @@ class CIU:
     # ONTVANGER-ZIJDE (Binnenkomende pakketten afhandelen)
     # =========================================================================
 
-    def receive_packet(self, packet):
-        """Verwerkt een binnenkomend instructie-pakket van een buur-CPU."""
+    # def receive_packet(self, packet):
+    #     """Verwerkt een binnenkomend instructie-pakket van een buur-CPU."""
+    #     cmd, arg_reg, arg_val, target_pc = packet
+
+    #     if cmd == CMD_CONTEXT:
+    #         # 1. High-Watermark check op deze lokale CPU
+    #         if len(self.cpu.free_cores) < self.HIGH_WATERMARK:
+    #             return False  # NACK! Te weinig headroom op deze CPU
+
+    #         # 2. STAP 1: Laad de overgedragen waarde in de HOOFD-registerfile van de CPU
+    #         reg_core_id = self.cpu.free_cores.popleft()
+    #         reg_core = self.cpu.cores[reg_core_id]
+    #         reg_core.value = arg_val
+    #         reg_core.coreStatus = "VALID"  # Data is gereed
+
+    #         # Koppel deze core aan de hoofd-registerfile van deze CPU
+    #         self.cpu.registers[arg_reg] = reg_core_id
+
+    #         # 3. STAP 2: LAZY IMPORT om circular import te voorkomen
+    #         from ExecuterZ32A import HardwareContext
+    #         # Maak de HardwareContext aan (deze leest nu automatisch self.cpu.registers[arg_reg]!)
+    #         nieuwe_ctx = HardwareContext(self.cpu, arg_reg)
+
+
+    #         # 4. STAP 3: Stel de start-PC van de thread in op de HEAT_WORKER
+    #         nieuwe_ctx.PC = target_pc
+    #         nieuwe_ctx.fsm_state = "FETCH"
+
+    #         # 5. Voeg de thread toe aan de actieve contexts van deze CPU
+    #         self.cpu.contexts.append(nieuwe_ctx)
+
+    #         # # === DEBUG PRINT BIJ SUCCESVOLLE INJECTIE (ACK) ===
+    #         # ctx_id = len(self.cpu.contexts)
+    #         # vrije_cores = len(self.cpu.free_cores)
+    #         # print(
+    #         #     f"\033[35m[CIU RX CPU{self.cpu.ID}] 🚀 Thread #{ctx_id}"
+    #         #     f" geïnjecteerd | PC: {target_pc} | Arg R{arg_reg} ="
+    #         #     f" {arg_val} | Cores over: {vrije_cores}\033[0m"
+    #         # )
+
+    #         reg_core.coreStatus = 'IDLE'    # return the core on next GC run
+
+    #         return True  # ACK!
+
+    def receive_packet(self, packet):   
         cmd, arg_reg, arg_val, target_pc = packet
 
         if cmd == CMD_CONTEXT:
-            # 1. High-Watermark check op deze lokale CPU
+            # 1. High-Watermark check
             if len(self.cpu.free_cores) < self.HIGH_WATERMARK:
-                return False  # NACK! Te weinig headroom op deze CPU
+                return False  # NACK!
 
-            # 2. STAP 1: Laad de overgedragen waarde in de HOOFD-registerfile van de CPU
-            reg_core_id = self.cpu.free_cores.popleft()
-            reg_core = self.cpu.cores[reg_core_id]
-            reg_core.value = arg_val
-            reg_core.coreStatus = "VALID"  # Data is gereed
+            # 2. maak de HardwareContext aan met de overgedragen data-waarde!
+            # from ExecuterZ32A import HardwareContext   # Lazzy import is not needed
 
-            # Koppel deze core aan de hoofd-registerfile van deze CPU
-            self.cpu.registers[arg_reg] = reg_core_id
+            nieuwe_ctx = HardwareContext(
+                self.cpu, source_reg=arg_reg, direct_value=arg_val
+            )
 
-            # 3. STAP 2: LAZY IMPORT om circular import te voorkomen
-            from ExecuterZ32A import HardwareContext
-            # Maak de HardwareContext aan (deze leest nu automatisch self.cpu.registers[arg_reg]!)
-            nieuwe_ctx = HardwareContext(self.cpu, arg_reg)
-
-
-            # 4. STAP 3: Stel de start-PC van de thread in op de HEAT_WORKER
+            # 3. Configureer en activeer de thread op de ontvangende CPU
             nieuwe_ctx.PC = target_pc
             nieuwe_ctx.fsm_state = "FETCH"
-
-            # 5. Voeg de thread toe aan de actieve contexts van deze CPU
             self.cpu.contexts.append(nieuwe_ctx)
 
-            # # === DEBUG PRINT BIJ SUCCESVOLLE INJECTIE (ACK) ===
-            # ctx_id = len(self.cpu.contexts)
-            # vrije_cores = len(self.cpu.free_cores)
+        # === DEBUG PRINT BIJ SUCCESVOLLE INJECTIE (ACK) ===
+            ctx_id = len(self.cpu.contexts)
+            vrije_cores = len(self.cpu.free_cores)
             # print(
             #     f"\033[35m[CIU RX CPU{self.cpu.ID}] 🚀 Thread #{ctx_id}"
             #     f" geïnjecteerd | PC: {target_pc} | Arg R{arg_reg} ="
             #     f" {arg_val} | Cores over: {vrije_cores}\033[0m"
             # )
 
-            reg_core.coreStatus = 'IDLE'    # return the core on next GC run
 
             return True  # ACK!
 
