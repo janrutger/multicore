@@ -563,7 +563,7 @@ def _execute_cycleZ32(master_cpu, target):
                 
             # 1. HARDWARE HIGH-WATERMARK CHECK: 
             # We hebben maximaal 10 cores per context nodig, om deadlocks te voorkomen een highwater mark van 10!
-            if len(master_cpu.free_cores) < 10:
+            if len(master_cpu.free_cores) < 15:
                 master_cpu.status = 0          # Signaleer FAIL naar de CPU status
                 target.fsm_state = 'FETCH'     # NIET STALLEN! Ga direct naar de volgende instructie (FAIL)
                 return                         # Breek de CONTEXT-allocatie veilig af

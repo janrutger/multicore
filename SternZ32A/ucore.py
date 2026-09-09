@@ -146,7 +146,7 @@ class Ucore:
             self.upc += 1
 
         # --- BUS DATA-DESK (Wachten op andere cores) ---
-        elif uinstruction == 'valid_v':
+        elif uinstruction == 'valid_v':            
             # arg1 is het ID van de bron-core. Check of die al VALID is
             if self.matrix[self.arg1].coreStatus == 'VALID':
                 # self.value = self.matrix[self.arg1].value
@@ -155,7 +155,7 @@ class Ucore:
                 raw_val = self.matrix[self.arg1].value
                 self.sign_v = (raw_val < 0)  # HIER registreren we het teken!
                 self.value = raw_val
-                self.matrix[self.arg1].coreStatus = 'IDLE'
+                # self.matrix[self.arg1].coreStatus = 'IDLE'
                 self.upc += 1
 
         elif uinstruction == 'valid_w':

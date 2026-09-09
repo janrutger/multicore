@@ -37,7 +37,7 @@ class CIU:
     Beheert 4 fysieke poorten (Link 0 t/m 3) voor communicatie met buren.
     """
 
-    HIGH_WATERMARK = 10  # Minimaal aantal vrije cores vereist op worker voor ACK
+    HIGH_WATERMARK = 15  # Minimaal aantal vrije cores vereist op worker voor ACK
 
     def __init__(self, cpu):
         self.cpu = cpu
