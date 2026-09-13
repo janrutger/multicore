@@ -42,21 +42,55 @@ class CIU:
     def __init__(self, cpu):
         self.cpu = cpu
         self.links = [None, None, None, None]  # Poorten: Link 0, 1, 2, 3
+        self.rr_pointer = 0  # Houdt bij welke poort als laatste geprobeerd is
         
     # =========================================================================
     # ZENDER-ZIJDE (Requests versturen)
     # =========================================================================
 
+    # def request_remote_context(self, task_pc, arg_reg, arg_val):
+    #     """Scant aangesloten links en biedt het instructie-pakket aan bij buren.
+
+    #     Retourneert True (ACK) als een buur de taak heeft aangenomen, anders
+    #     False (NACK).
+    #     """
+    #     packet = (CMD_CONTEXT, arg_reg, arg_val, task_pc)
+
+    #     for link in self.links:
+        
+    #         if link is None:
+    #             continue
+
+    #         neighbor_ciu = link.get_other_end(self)
+    #         if neighbor_ciu is None:
+    #             continue
+
+    #         # Bied het pakket aan de buur-CIU aan
+    #         ack = neighbor_ciu.receive_packet(packet)
+    #         if ack:
+    #             # print(f"[CIU CPU{self.cpu.ID}] ACK ontvangen! Remote context injected.")
+    #             return True
+    #         # else:     # Als deze buur NACK geeft, loopt de for-lus gewoon door naar de volgende link!
+    #         #     # print(f"[CIU CPU{self.cpu.ID}] NACK ontvangen van alle buren.")
+    #         #     return False
+
+    #     return False  # NACK: Geen aangesloten buren of alle buren zitten vol
+
     def request_remote_context(self, task_pc, arg_reg, arg_val):
-        """Scant aangesloten links en biedt het instructie-pakket aan bij buren.
+        """Scant aangesloten links volgens Round-Robin en biedt het
+        instructie-pakket aan bij buren.
 
         Retourneert True (ACK) als een buur de taak heeft aangenomen, anders
         False (NACK).
         """
         packet = (CMD_CONTEXT, arg_reg, arg_val, task_pc)
+        num_links = len(self.links)
 
-        for link in self.links:
-        
+        # Scan 4 poorten vanaf de huidige Round-Robin pointer
+        for i in range(num_links):
+            port_id = (self.rr_pointer + i) % num_links
+            link = self.links[port_id]
+
             if link is None:
                 continue
 
@@ -64,14 +98,12 @@ class CIU:
             if neighbor_ciu is None:
                 continue
 
-            # Bied het pakket aan de buur-CIU aan
+            # Bied het pakket aan de buur-CIU aan via jouw bestaande receive_packet
             ack = neighbor_ciu.receive_packet(packet)
             if ack:
-                # print(f"[CIU CPU{self.cpu.ID}] ACK ontvangen! Remote context injected.")
+                # ACK ontvangen! Zet de pointer klaar op de VOLGENDE poort voor de volgende taak
+                self.rr_pointer = (port_id + 1) % num_links
                 return True
-            # else:     # Als deze buur NACK geeft, loopt de for-lus gewoon door naar de volgende link!
-            #     # print(f"[CIU CPU{self.cpu.ID}] NACK ontvangen van alle buren.")
-            #     return False
 
         return False  # NACK: Geen aangesloten buren of alle buren zitten vol
 

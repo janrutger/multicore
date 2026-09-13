@@ -5,12 +5,12 @@ MAP {
     ; === GEHEUGEN ALLOCATIE ===
     RES notused 513         ; Vult het Private Memory bereik (2048..2559) netjes op
     RES failcount 1         ; Teller voor gemiste spawns (Adres 2046)
-    RES grid 400            ; Iteratie-resultaten per pixel (20x20 = 400 cellen)
+    RES grid 900            ; Iteratie-resultaten per pixel (20x20 = 400 cellen) (30x30 = 900 cellen)
     RES draw_ptr 1          ; Pointer voor interleaved display-rendering (0..400)
 
     ; === CONSTANTEN & SCHALEN ===
-    CONST ROW_SIZE 20       ; Breedte en hoogte van het raster (20x20)
-    CONST TOTAL_CELLS 400   ; Totaal aantal pixels
+    CONST ROW_SIZE 30       ; Breedte en hoogte van het raster (20x20), (30x30)
+    CONST TOTAL_CELLS 900   ; Totaal aantal pixels
     CONST MAX_ITER 32       ; Maximale Mandelbrot iteratiediepte
 
     ; Fixed-Point Schaal (1000 = 1.000)
@@ -145,7 +145,8 @@ main:
     ; ==========================================================
     ; 2. RESTERENDE PIXELS VEGEN EN PLOTTEN NAAR SCHERM
     ; ==========================================================
-    [draw_ptr] -> I
+    ; [draw_ptr] -> I
+    0 -> I                  ; teken het hele raster
     TOTAL_CELLS -> B
 
     REPEAT UNTIL (I == B) {
@@ -199,21 +200,23 @@ main:
         X -> A
         ROW_SIZE -> B
         MOD A B             ; A = px (0..19)
-        MULI A 150
+        ; MULI A 150        ; (20x20)
+        MULI A 95           ; (30x30)
         SUBI A 2000
         A -> C              ; C = cx (vastgehouden in C)
 
         ; cy = (py * 150) - 1350  ==> Bereik: [-1.350 t/m +1.500]
         X -> A
         DIVI A ROW_SIZE     ; A = py (0..19)
-        MULI A 150
+        ; MULI A 150        ; (20x20)
+        MULI A 95           ; (30x30)
         SUBI A 1350
         A -> K              ; K = cy (vastgehouden in K)
 
         ; --- B. INITIALISEER ITERATIE Z = 0 + 0i ---
-        0 -> L              ; L = zx = 0
-        0 -> M              ; M = zy = 0
-        0 -> Y              ; Y = iteratieteller = 0
+        ; 0 -> L              ; L = zx = 0
+        ; 0 -> M              ; M = zy = 0
+        ; 0 -> Y              ; Y = iteratieteller = 0
 
     MANDEL_LOOP:
         ; --- C. BEREKEN zx^2 EN zy^2 (Met Fixed-Point Afronding) ---

@@ -243,7 +243,7 @@ def _execute_cycleZ32(master_cpu, target):
             src1_core = target.registers[reg1]
             src2_core = target.registers[arg2] 
             
-            master_cpu.cores[core_id].dispatch('slow_mul', arg1=src1_core, arg2=src2_core)
+            master_cpu.cores[core_id].dispatch('mul', arg1=src1_core, arg2=src2_core)
             target.registers[reg1] = core_id
             target.last_active_core = core_id
 

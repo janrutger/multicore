@@ -85,11 +85,11 @@ class GraphicalDisplay:
                 # --- HARDWARE CLIPPING ---
                 if 0 <= x < self.width and 0 <= y < self.height:
                     # Modulo 16 dwingt de index af binnen het 16-kleuren palet
-                    color_idx = cmd["value1"] % 15
+                    color_idx = cmd["value1"] % 16
                     color = self.palette[color_idx]
                     
                     # Teken een 1x1 pixel (of groter blok op basis van je pixel-schaal)
-                    self.canvas.create_rectangle(x, y, x+4, y+4, outline=color, fill=color)
+                    self.canvas.create_rectangle(x, y, x+1, y+1, outline=color, fill=color)
 
 # class GraphicalDisplay:
 #     def __init__(self, master_root):
