@@ -217,15 +217,15 @@ STREAM_DONE:
         ; Register Y bevat het slot-ID (0..11) en blijft intact!
 
         ; --- A. LEES GLOBAL PX EN PY UIT MAILBOX SLOT Y ---
-        [mb_px + Y] -> A            ; A = global_px (0..35)
-        MULI A 14                   ; (36x36=80) (100x100=28) (200x200=14)
-        SUBI A 2000
-        A -> C                      ; C = cx = (global_px * 80) - 2000
+        [mb_px + Y] -> C            ; A = global_px (0..35)
+        MULI C 14                   ; (36x36=80) (100x100=28) (200x200=14)
+        SUBI C 2000
+        ; A -> C                      ; C = cx = (global_px * 80) - 2000
 
-        [mb_py + Y] -> A            ; A = global_py (0..35)
-        MULI A 14                   ; (36x36=80) (100x100=28) (200x200=14)
-        SUBI A 1400
-        A -> K                      ; K = cy = (global_py * 80) - 1400
+        [mb_py + Y] -> K            ; A = global_py (0..35)
+        MULI K 14                   ; (36x36=80) (100x100=28) (200x200=14)
+        SUBI K 1400
+        ; A -> K                      ; K = cy = (global_py * 80) - 1400
 
         ; --- B. INITIALISEER Z = 0 + 0i ---
         ; 0 -> L                      ; zx = 0
