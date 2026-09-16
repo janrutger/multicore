@@ -107,6 +107,7 @@ class MMU:
                 return "OK"
             else:
                 # Een ANDERE CPU was in deze klokcyclus al eerder met schrijven naar dit blok!
+                # print(f"Adres {adres} is locked, stalling to next tick")
                 return "STALL"
 
         # 3. Private memory schrijven
