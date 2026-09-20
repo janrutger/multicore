@@ -39,7 +39,7 @@ class Op(IntEnum):
     SUBI  = 53      # Implemented
     MULI  = 61      # Implemented
     DIVI  = 63      # Implemented
-    TST   = 70
+    TST   = 70      # Implemented
     ANDI  = 82
     # STACK = 92
     # USTACK= 93
@@ -57,10 +57,10 @@ class Op(IntEnum):
     # --- FORMAT: TWO_REG_REG ---
     LD    = 30      # Implemented 
     ADD   = 50      # Implemented 
-    SUB   = 52
+    SUB   = 52      # Implemented
     MUL   = 60      # Implemented
     MOD   = 65      # Implemented
-    DIV   = 66
+    DIV   = 66      # Implemented
     TSTE  = 71      # Implemented
     TSTG  = 72      # Implemented
 
@@ -124,6 +124,7 @@ MICROCODE_ROM = {
 
     'tstz':   ['valid_v', 'tstz', 'setResult'],
     'tstn':   ['valid_v', 'tstn', 'setResult'],
+    'tst':    ['valid_v', 'mv_tw', 'cmpe', 'setResult'],
 
     'cmpe':   ['valid_v', 'valid_w', 'cmpe',  'setResult'],
     'cmpne':  ['valid_v', 'valid_w', 'cmpne', 'setResult'],

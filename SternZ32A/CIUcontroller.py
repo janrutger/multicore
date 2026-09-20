@@ -44,37 +44,6 @@ class CIU:
         self.links = [None, None, None, None]  # Poorten: Link 0, 1, 2, 3
         self.rr_pointer = 0  # Houdt bij welke poort als laatste geprobeerd is
         
-    # =========================================================================
-    # ZENDER-ZIJDE (Requests versturen)
-    # =========================================================================
-
-    # def request_remote_context(self, task_pc, arg_reg, arg_val):
-    #     """Scant aangesloten links en biedt het instructie-pakket aan bij buren.
-
-    #     Retourneert True (ACK) als een buur de taak heeft aangenomen, anders
-    #     False (NACK).
-    #     """
-    #     packet = (CMD_CONTEXT, arg_reg, arg_val, task_pc)
-
-    #     for link in self.links:
-        
-    #         if link is None:
-    #             continue
-
-    #         neighbor_ciu = link.get_other_end(self)
-    #         if neighbor_ciu is None:
-    #             continue
-
-    #         # Bied het pakket aan de buur-CIU aan
-    #         ack = neighbor_ciu.receive_packet(packet)
-    #         if ack:
-    #             # print(f"[CIU CPU{self.cpu.ID}] ACK ontvangen! Remote context injected.")
-    #             return True
-    #         # else:     # Als deze buur NACK geeft, loopt de for-lus gewoon door naar de volgende link!
-    #         #     # print(f"[CIU CPU{self.cpu.ID}] NACK ontvangen van alle buren.")
-    #         #     return False
-
-    #     return False  # NACK: Geen aangesloten buren of alle buren zitten vol
 
     def request_remote_context(self, task_pc, arg_reg, arg_val):
         """Scant aangesloten links volgens Round-Robin en biedt het
@@ -134,53 +103,6 @@ class CIU:
 
         return True
 
-    # =========================================================================
-    # ONTVANGER-ZIJDE (Binnenkomende pakketten afhandelen)
-    # =========================================================================
-
-    # def receive_packet(self, packet):
-    #     """Verwerkt een binnenkomend instructie-pakket van een buur-CPU."""
-    #     cmd, arg_reg, arg_val, target_pc = packet
-
-    #     if cmd == CMD_CONTEXT:
-    #         # 1. High-Watermark check op deze lokale CPU
-    #         if len(self.cpu.free_cores) < self.HIGH_WATERMARK:
-    #             return False  # NACK! Te weinig headroom op deze CPU
-
-    #         # 2. STAP 1: Laad de overgedragen waarde in de HOOFD-registerfile van de CPU
-    #         reg_core_id = self.cpu.free_cores.popleft()
-    #         reg_core = self.cpu.cores[reg_core_id]
-    #         reg_core.value = arg_val
-    #         reg_core.coreStatus = "VALID"  # Data is gereed
-
-    #         # Koppel deze core aan de hoofd-registerfile van deze CPU
-    #         self.cpu.registers[arg_reg] = reg_core_id
-
-    #         # 3. STAP 2: LAZY IMPORT om circular import te voorkomen
-    #         from ExecuterZ32A import HardwareContext
-    #         # Maak de HardwareContext aan (deze leest nu automatisch self.cpu.registers[arg_reg]!)
-    #         nieuwe_ctx = HardwareContext(self.cpu, arg_reg)
-
-
-    #         # 4. STAP 3: Stel de start-PC van de thread in op de HEAT_WORKER
-    #         nieuwe_ctx.PC = target_pc
-    #         nieuwe_ctx.fsm_state = "FETCH"
-
-    #         # 5. Voeg de thread toe aan de actieve contexts van deze CPU
-    #         self.cpu.contexts.append(nieuwe_ctx)
-
-    #         # # === DEBUG PRINT BIJ SUCCESVOLLE INJECTIE (ACK) ===
-    #         # ctx_id = len(self.cpu.contexts)
-    #         # vrije_cores = len(self.cpu.free_cores)
-    #         # print(
-    #         #     f"\033[35m[CIU RX CPU{self.cpu.ID}] 🚀 Thread #{ctx_id}"
-    #         #     f" geïnjecteerd | PC: {target_pc} | Arg R{arg_reg} ="
-    #         #     f" {arg_val} | Cores over: {vrije_cores}\033[0m"
-    #         # )
-
-    #         reg_core.coreStatus = 'IDLE'    # return the core on next GC run
-
-    #         return True  # ACK!
 
     def receive_packet(self, packet):   
         cmd, arg_reg, arg_val, target_pc = packet
@@ -203,8 +125,8 @@ class CIU:
             self.cpu.contexts.append(nieuwe_ctx)
 
         # === DEBUG PRINT BIJ SUCCESVOLLE INJECTIE (ACK) ===
-            ctx_id = len(self.cpu.contexts)
-            vrije_cores = len(self.cpu.free_cores)
+            # ctx_id = len(self.cpu.contexts)
+            # vrije_cores = len(self.cpu.free_cores)
             # print(
             #     f"\033[35m[CIU RX CPU{self.cpu.ID}] 🚀 Thread #{ctx_id}"
             #     f" geïnjecteerd | PC: {target_pc} | Arg R{arg_reg} ="

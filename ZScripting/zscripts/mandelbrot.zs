@@ -3,10 +3,10 @@ MAP {
     START main
 
     ; === GEHEUGEN ALLOCATIE ===
-    RES notused 513         ; Vult het Private Memory bereik (2048..2559) netjes op
-    RES failcount 1         ; Teller voor gemiste spawns (Adres 2046)
-    RES grid 900            ; Iteratie-resultaten per pixel (20x20 = 400 cellen) (30x30 = 900 cellen)
-    RES draw_ptr 1          ; Pointer voor interleaved display-rendering (0..400)
+    ; RES notused 513         ; Vult het Private Memory bereik (2048..2559) netjes op
+    SHARED failcount 1         ; Teller voor gemiste spawns (Adres 2046)
+    SHARED grid 900            ; Iteratie-resultaten per pixel (20x20 = 400 cellen) (30x30 = 900 cellen)
+    SHARED draw_ptr 1          ; Pointer voor interleaved display-rendering (0..400)
 
     ; === CONSTANTEN & SCHALEN ===
     CONST ROW_SIZE 30       ; Breedte en hoogte van het raster (20x20), (30x30)
