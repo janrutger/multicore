@@ -9,7 +9,7 @@ from assemblerV2 import assemble
 from frontpanelZ32G import FrontPanel
 from InmosZ32A import CPU
 from IOcontroller import IOController
-from CIUcontroller import ChannelLink
+from CIUcontrollerV2 import ChannelLink
 from memoryMMU import MMU
 from opcodes import context_stress, display_test, encrypt_program
 
@@ -43,6 +43,16 @@ class SternZ32Mainboard:
         ChannelLink(self.cpus[0].ciu, 1, self.cpus[2].ciu, 0)
         ChannelLink(self.cpus[0].ciu, 2, self.cpus[3].ciu, 0) 
         ChannelLink(self.cpus[0].ciu, 3, self.cpus[4].ciu, 0)   
+
+        ChannelLink(self.cpus[1].ciu, 1, self.cpus[2].ciu, 1)
+        ChannelLink(self.cpus[1].ciu, 2, self.cpus[3].ciu, 1)
+        ChannelLink(self.cpus[1].ciu, 3, self.cpus[4].ciu, 1)
+
+        ChannelLink(self.cpus[2].ciu, 2, self.cpus[3].ciu, 2)
+        ChannelLink(self.cpus[2].ciu, 3, self.cpus[4].ciu, 2)
+
+        ChannelLink(self.cpus[3].ciu, 3, self.cpus[4].ciu, 3)
+
 
         # =========================================================================
         # --- DEBUG ROUTINE: TOON CIU TOPOLOGIE EN AFBREKEN ---

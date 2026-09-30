@@ -2,12 +2,12 @@
 # Start of the new Context based parrallel CPU
 
 from collections import deque
-from CIUcontroller import CIU  # <-- 1. IMPORT CIU CONTROLLER
+from CIUcontrollerV2 import CIU  # <-- 1. IMPORT CIU CONTROLLER
 # from memory import Memory
 from memoryMMU import MMU 
 from ucore  import Ucore
 
-from ExecuterZ32A import _execute_cycleZ32 
+from ExecuterZ32AV2 import _execute_cycleZ32 
 
 
 # Importeer de STERN-boekhouding uit het andere bestand
@@ -18,6 +18,7 @@ class CPU:
         # self.memory = Memory(size=1024)
         # self.memory = Memory(Page0=1024, Private=512, Shared=1024, block_size=64)
         self.ID = cpu_id
+        self.parent_id = cpu_id
         # Als er geen MMU wordt meegegeven, maken we een stand-alone instantie aan.
         # Als er wél een MMU wordt meegegeven (zoals door het Mainboard), gebruiken we die!
         self.memory = (
@@ -46,7 +47,7 @@ class CPU:
         for core in self.cores:
             core.initCoreMatrix(self.cores)
 
-        self.last_active_core = None
+        # self.last_active_core = None      # Buitengebruik sind 20sept26
         self.last_test_core   = None        # Slaat specifiek de Core-ID op van de LAATSTE test/vergelijking
 
 

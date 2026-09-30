@@ -1,5 +1,9 @@
 MAP {
-    MEMSIZE 1024
+    MEMORY {
+        PROGRAM 1024
+        SHARED  1024
+        PRIVATE 512
+    }
     START main
 
     

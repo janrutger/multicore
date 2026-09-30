@@ -3,10 +3,13 @@
 from opcodes import Op, FORMAT_ZERO, FORMAT_ONE_ADDR, FORMAT_ONE_REG, FORMAT_TWO_REG_REG, FORMAT_TWO_REG_VAL
 
 class HardwareContext:
-    def __init__(self, master_cpu, source_reg, direct_value=None):
-        self.memory = master_cpu.memory
-        self.cores = master_cpu.cores
+    def __init__(self, master_cpu, source_reg, direct_value=None, parent_cpu_id=None):
+        self.parent_id = parent_cpu_id
+        self.memory    = master_cpu.memory
+        self.cores     = master_cpu.cores
         self.registers = {i: None for i in range(10)}
+
+        # print(self.parent_id)     # DEBUG print
 
         # Als er een direct_value is meegegeven (via CIU RCONTEXT), gebruiken we die!
         if direct_value is not None:
@@ -136,6 +139,21 @@ def _execute_cycleZ32(master_cpu, target):
             master_cpu.cores[core_id].dispatch('ldv') 
             
             # Sla het uCore ID op in het bestemmingsregister
+            target.registers[reg1] = core_id
+
+        elif opcode == Op.PID:
+            if not master_cpu.free_cores: return # Stall als er geen vrije uCores zijn
+            core_id = master_cpu.free_cores.popleft()
+            
+            # Haal het parent CPU ID op uit de actieve hardware context (target)
+            # Valt terug op het eigen master_cpu.ID als parent_id om een of andere reden None is
+            parent_id_value = target.parent_id if target.parent_id is not None else master_cpu.ID
+            
+            # Laad de waarde via het uCore transfer mechanisme
+            master_cpu.cores[core_id].transfer = parent_id_value
+            master_cpu.cores[core_id].dispatch('ldv') 
+            
+            # Sla het uCore ID op in het bestemmingsregister (Rx / reg1)
             target.registers[reg1] = core_id
 
         elif opcode == Op.LDM:
@@ -512,7 +530,8 @@ def _execute_cycleZ32(master_cpu, target):
                 return                         # Breek de CONTEXT-allocatie veilig af
             
             # 2. Allocatie is gegarandeerd succesvol! Maak nu pas de hardware context aan
-            nieuwe_ctx = HardwareContext(master_cpu, reg1)
+            parent_cpu_id = master_cpu.ID
+            nieuwe_ctx = HardwareContext(master_cpu, reg1, parent_cpu_id=parent_cpu_id)
                 
             # 3. Configureer de startparameters van de thread
             nieuwe_ctx.PC = arg2            # Dit wordt het startadres (bijv. 11)
@@ -765,8 +784,132 @@ def _execute_cycleZ32(master_cpu, target):
                 
             target.fsm_state = 'FETCH'
 
+        
 
+        # =========================================================================
+        #   CIU MAILBOX INSTRUCTIES (Met uCore Status Synchronisatie & Stalling)
+        # =========================================================================
+
+        elif opcode == Op.MSG_START:
+            # msg_start Rx, Ry  (reg1 = Rx [TAG], arg2 = Ry [SIZE -> ontvangt tx_slotID])
+            rx_core_id = target.registers[reg1]
+            ry_core_id = target.registers[arg2]
+
+            # 1. VALIDEER SOURCE uCORES (Stall als TAG of SIZE nog niet VALID zijn!)
+            if rx_core_id is None or ry_core_id is None: return
+            core_rx = master_cpu.cores[rx_core_id]
+            core_ry = master_cpu.cores[ry_core_id]
+            if core_rx.coreStatus != 'VALID' or core_ry.coreStatus != 'VALID':
+                return  # STALL: Wacht tot uCores klaar zijn!
+
+            # 2. CONTROLEER VRIJE uCORE VOOR RESULTAAT (tx_slotID)
+            if not master_cpu.free_cores: return  # STALL
+
+            tag_val  = core_rx.value
+            size_val = core_ry.value
+
+            parent_id = getattr(target, 'parent_id', getattr(master_cpu, 'parent_id', 0))
+
+            tx_id = master_cpu.ciu.msg_start(tag_val, size_val, parent_id)
+
+            # Sla gegenereerde tx_slotID op in een nieuwe uCore voor Ry (arg2)
+            core_id = master_cpu.free_cores.popleft()
+            master_cpu.cores[core_id].transfer = tx_id
+            master_cpu.cores[core_id].dispatch('ldv')
+            target.registers[arg2] = core_id
+
+        elif opcode == Op.MSG_WRITE:
+            # msg_write Ry, Rx  (reg1 = Ry [tx_slotID], arg2 = Rx [DATA])
+            ry_core_id = target.registers[reg1]
+            rx_core_id = target.registers[arg2]
+
+            # VALIDEER SOURCE uCORES (Stall als tx_slotID of DATA (bijv. MUL) nog niet VALID is!)
+            if ry_core_id is None or rx_core_id is None: return
+            core_ry = master_cpu.cores[ry_core_id]
+            core_rx = master_cpu.cores[rx_core_id]
+            if core_ry.coreStatus != 'VALID' or core_rx.coreStatus != 'VALID':
+                return  # STALL: Wacht tot bijv. MUL A A klaar is!
+
+            tx_id    = core_ry.value
+            data_val = core_rx.value
+
+            master_cpu.ciu.msg_write(tx_id, data_val)
+
+        elif opcode == Op.MSG_DONE:
+            # msg_done Ry       (reg1 = Ry [tx_slotID])
+            ry_core_id = target.registers[reg1]
+
+            if ry_core_id is None: return
+            core_ry = master_cpu.cores[ry_core_id]
+            if core_ry.coreStatus != 'VALID':
+                return  # STALL
+
+            tx_id = core_ry.value
+            master_cpu.ciu.msg_done(tx_id)
+
+        elif opcode == Op.MSG_OPEN:
+            # msg_open Rx       (reg1 = Rx [Ontvangt read_slotID])
+            if not master_cpu.free_cores: return  # STALL
+
+            rx_id = master_cpu.ciu.msg_open()
+
+            core_id = master_cpu.free_cores.popleft()
+            master_cpu.cores[core_id].transfer = rx_id
+            master_cpu.cores[core_id].dispatch('ldv')
+            target.registers[reg1] = core_id
+
+        elif opcode == Op.MSG_PROBE:
+            # msg_probe Ry, Rx  (reg1 = Ry [read_slotID], arg2 = Rx [Ontvangt TAG])
+            ry_core_id = target.registers[reg1]
+
+            if ry_core_id is None: return
+            core_ry = master_cpu.cores[ry_core_id]
+            if core_ry.coreStatus != 'VALID':
+                return  # STALL
+
+            if not master_cpu.free_cores: return  # STALL voor destination uCore
+
+            read_id = core_ry.value
+            tag_val = master_cpu.ciu.msg_probe(read_id)
+
+            core_id = master_cpu.free_cores.popleft()
+            master_cpu.cores[core_id].transfer = tag_val
+            master_cpu.cores[core_id].dispatch('ldv')
+            target.registers[arg2] = core_id
+
+        elif opcode == Op.MSG_READ:
+            # msg_read Ry, Rx   (reg1 = Ry [read_slotID], arg2 = Rx [Ontvangt DATA])
+            ry_core_id = target.registers[reg1]
+
+            if ry_core_id is None: return
+            core_ry = master_cpu.cores[ry_core_id]
+            if core_ry.coreStatus != 'VALID':
+                return  # STALL
+
+            if not master_cpu.free_cores: return  # STALL voor destination uCore
+
+            read_id = core_ry.value
+            data_val = master_cpu.ciu.msg_read(read_id)
+
+            core_id = master_cpu.free_cores.popleft()
+            master_cpu.cores[core_id].transfer = data_val
+            master_cpu.cores[core_id].dispatch('ldv')
+            target.registers[arg2] = core_id
+
+        elif opcode == Op.MSG_CLOSE:
+            # msg_close Ry      (reg1 = Ry [read_slotID])
+            ry_core_id = target.registers[reg1]
+
+            if ry_core_id is None: return
+            core_ry = master_cpu.cores[ry_core_id]
+            if core_ry.coreStatus != 'VALID':
+                return  # STALL
+
+            read_id = core_ry.value
+            master_cpu.ciu.msg_close(read_id)
+
+        
+        
+        
         # Zorg dat de standaardafhandeling de eigen FSM reset
         target.fsm_state = 'FETCH'
-
-

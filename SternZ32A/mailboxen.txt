@@ -1,0 +1,78 @@
+
+De CIU wordt uitgebreid met een FiFo Mailbox
+
+Iedere CPU/Rcontext kan, via de CIU, een bericht sturen naar een connected 
+de ontvanger heeft een read en een write pointer
+de ontvanger kan de berichten lezen vanuit de mail-loop en vanuit locale contexten
+de enveloppen kunnen meerdere waardes bevatten, en hebben afzender CPIid, mesg-size, status als header
+
+onafhankelijk van de bericht omvang kan de FiFo mailbox 512 berichten bevatten.
+wanneer er niet snel genoeg gelezen wordt, loopt deze FiFo vol, in dat geval een harde exit
+Abandoned slots leveren een read-write pointer collission, bij iedere read-write collision dezelfe harde exit
+
+versturen van een bericht
+
+msg_start Rx Ry 
+    - Rx is de remote CPU 
+    - Ry is de size van het bericht en wordt de actuele write pointer
+    mesg_start vraagt aan zijn locale CIU of CPU Rx bekend is, nee, dan harde fout 
+    de locale CIU vraagt aan Rx een write-pointer,
+    de remote CIU ziet de vraag, reserveerd het slot (afzender en size, values) set de status op WRITING en retouneert de write pointer
+    en verhoogt de write_pointer voor de volgende msg_start
+    de locale CIU maakt een tijdelijk slotID, (slotID, linkID, write-pointer) en retouneert het slotID naar Ry
+
+msg_write Ry Rx
+    - Ry is tijdelijk slotID
+    - Rx is de value
+    msg_write zegt tegen de locale CIU, stuur Rx naar slot Ry
+    de locale CIU kijkt of het een geldig slotID is, nee, dan cpustatus FALSE
+    de locale CIU stuurt Rx write-pointer naar de andere zijde van het linkID
+    De remote CIU ontvangt value en writepointer, controleeert of de status writing is, nee, dan cpustatus FALSE
+    en schrijft de value naar de envelop
+
+    Er moeten size maal msg_write gedaan worden
+
+msg_done Ry
+    - Ry is tijdelijk slotID
+    msg_done is einde bericht, het slot ID in Ry wordt naar de locale CIU gestuurd
+    De locale CIU ziet het bericht en informeert de remote CIU
+    de remote CIU zet de berichten status op VALID
+    de locale CIU ruimt zijn tijdelijke slotID op
+
+
+
+Lezen van een bericht (Read API)
+msg_open Rx
+    Rx ontvangt het gegenereerde read_slotID.
+    msg_open vraagt aan de lokale CIU of er op de actuele read_pointer een bericht klaarstaat met de status VALID.
+    Indien VALID:
+        De lokale CIU reserveert het bericht voor de lezer en veranderd de status direct naar READING (voorkomt dat andere contexten op dezelfde CPU hetzelfde bericht tegelijkertijd openen).
+        De lokale CIU genereert een tijdelijk read_slotID (read_slotID, read_pointer, data_offset) en retourneert dit in register Rx.
+        De berichten status wordt Reading en de readpointer wordt verplaatst
+        cpustatus wordt ingesteld op TRUE.
+    Indien GEEN VALID bericht (FiFo leeg of bericht nog in WRITING):
+        Er wordt geen slot geopend; cpustatus wordt ingesteld op FALSE.
+
+msg_probe Ry Rx
+    Ry is het actieve read_slotID.
+    Rx is het bestemmingsregister voor de opgevraagde header-informatie.
+    msg_probe leest de metadata uit de header van het geopende slot.
+
+    msg_probe levert in Rx de berichtgrootte (msg_size) op. Dit stelt de lezer in staat om te bepalen hoeveel msg_read-acties er moeten volgen.
+
+msg_read Ry Rx
+    Ry is het actieve read_slotID.
+    Rx is het bestemmingsregister waarin de uitgelezen waarde wordt opgeslagen.
+    De lokale CIU controleert of Ry een geldig read_slotID is met de status READING. Zo niet: cpustatus = FALSE.
+    De CIU leest het volgende datawoord uit de envelop op de huidige data_offset, slaat dit via een uCore-allocatie op in register Rx, en verhoogt de interne data_offset voor dit read_slotID.
+
+    Er moeten exact msg_size maal msg_read worden uitgevoerd.
+
+msg_close Ry
+    Ry is het actieve read_slotID.
+    msg_close geeft aan dat het bericht volledig is verwerkt.
+    De lokale CIU zet de status van het betreffende FiFo-slot op FREE / EMPTY.
+
+    Het tijdelijke read_slotID in Ry wordt opgeruimd.
+
+

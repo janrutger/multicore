@@ -1,9 +1,13 @@
 MAP {
-    MEMSIZE 1024
+    MEMORY {
+        PROGRAM 1024
+        SHARED  1024
+        PRIVATE 512
+    }
     START main
 
-    RES grid_current 100    ; Huidige temperatuur-raster (10x10)
-    RES grid_next 100       ; Buffer voor de berekende volgende stap
+    SHARED grid_current 100    ; Huidige temperatuur-raster (10x10)
+    SHARED grid_next 100       ; Buffer voor de berekende volgende stap
 
     CONST GRID_SIZE 99
     CONST ROW_SIZE 10

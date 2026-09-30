@@ -1,14 +1,12 @@
-# opcodes.py
+
 from enum import IntEnum
 
 class Op(IntEnum):
     # --- FORMAT: ZERO ---
-    NOP   = 10
-    HALT  = 11      # Implemented
-    IOSYNC= 12      # NEW: Non-blocking tick voor de IO-controller
-    # RET   = 12
-    # EI    = 13
-    # DI    = 14
+    NOP     = 10
+    HALT    = 11      # Implemented
+    IOSYNC  = 12      # NEW: Non-blocking tick voor de IO-controller
+    SUSPEND = 14      # Implemented
     # RTI   = 15
 
     CLOSE     = 29      # Implemented
@@ -46,8 +44,8 @@ class Op(IntEnum):
 
     CONTEXT = 27      # Implemented
     JOIN    = 28      # Implemented
-    RCONTEXT    = 36  # Remote Context Injection via CIU
-    BOOT_REMOTE = 37  # Remote CPU Boot via CIU
+    RCONTEXT= 36  # Remote Context Injection via CIU
+    RBOOT   = 37  # Remote CPU Boot via CIU
 
     SHIFTL   = 43      # Implemented
     SHIFTR   = 46      # Implemented
@@ -65,6 +63,12 @@ class Op(IntEnum):
     TSTG  = 72      # Implemented
 
     XOR    = 42     # Implemented
+
+    # --- CIU MAILBOX API (FORMAT: TWO_REG_REG) ---
+    MSG_START = 83  # msg_start Rx, Ry (Rx = TAG, Ry = SIZE -> TxSlotID)
+    MSG_WRITE = 84  # msg_write Ry, Rx (Ry = TxSlotID, Rx = Value)
+    MSG_PROBE = 87  # msg_probe Ry, Rx (Ry = RxSlotID, Rx <- TAG)
+    MSG_READ  = 88  # msg_read Ry, Rx  (Ry = RxSlotID, Rx <- Data)
     
 
     # --- FORMAT: ONE_REG ---
@@ -75,17 +79,30 @@ class Op(IntEnum):
     INC   = 80     # Implemented
     DEC   = 81     # Implemented
     TSTZ  = 73     # Implemented
+    CPUID = 96
+    PID   = 94
+
+    # --- CIU MAILBOX API (FORMAT: ONE_REG) ---
+    MSG_DONE  = 85  # msg_done Ry      (Ry = TxSlotID)
+    MSG_OPEN  = 86  # msg_open Rx      (Rx <- RxSlotID)
+    MSG_CLOSE = 89  # msg_close Ry     (Ry = RxSlotID)
 
 # Vaste sets voor de decoder om snel het format te matchen
-FORMAT_ZERO        = {Op.NOP, Op.HALT, Op.CLOSE, Op.IOSYNC, Op.AUTOCLOSE}
-FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.SUCCES, Op.FAIL, Op.SYNC, Op.ALLSYNC,}
-FORMAT_ONE_REG     = {Op.INC, Op.DEC, Op.TSTZ}
-FORMAT_TWO_REG_REG = {Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.DIV, Op.TSTE, Op.TSTG, Op.XOR}
+FORMAT_ZERO        = {Op.NOP, Op.HALT, Op.CLOSE, Op.IOSYNC, Op.AUTOCLOSE, Op.SUSPEND}
+FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.SUCCES, Op.FAIL, Op.SYNC, Op.ALLSYNC}
+FORMAT_ONE_REG     = {
+    Op.INC, Op.DEC, Op.TSTZ, Op.CPUID, Op.PID,
+    Op.MSG_DONE, Op.MSG_OPEN, Op.MSG_CLOSE
+}
+FORMAT_TWO_REG_REG = {
+    Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.DIV, Op.TSTE, Op.TSTG, Op.XOR,
+    Op.MSG_START, Op.MSG_WRITE, Op.MSG_PROBE, Op.MSG_READ
+}
 FORMAT_TWO_REG_VAL = {
     Op.LDI, Op.LDM, Op.LDX, Op.OUT, Op.IN, Op.STO, Op.STX, 
     Op.SHIFTL, Op.SHIFTR, Op.ROTL32, Op.SM32_RND, Op.CONTEXT, Op.JOIN, 
     Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI, Op.RCONTEXT,
-    Op.BOOT_REMOTE,  
+    Op.RBOOT,  
 }
 
 

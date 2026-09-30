@@ -112,6 +112,10 @@ class CIU:
             if len(self.cpu.free_cores) < self.HIGH_WATERMARK:
                 return False  # NACK!
 
+            # Status check. only start when the CPU is expecting work
+            if self.cpu.fsm_state != "WAIT_FOR_WORK":
+                return False  # NACK!
+
             # 2. maak de HardwareContext aan met de overgedragen data-waarde!
             # from ExecuterZ32A import HardwareContext   # Lazzy import is not needed
 
@@ -137,10 +141,19 @@ class CIU:
             return True  # ACK!
 
         elif cmd == CMD_BOOT:
-            # Wek de hoofd-pijplijn van de CPU op en stel zijn PC in
+            # 1. Controleer of de CPU in rust staat (klaar om opgewekt te worden)
+            if self.cpu.fsm_state not in ["WAIT_FOR_WORK", "HALT"]:
+                return False  # NACK: CPU is al bezig met een andere taak
+
+            # 2. High-Watermark check: vereist minimaal 15 vrije uCores
+            if len(self.cpu.free_cores) < self.HIGH_WATERMARK:
+                self.cpu.fsm_state = "HALT"         # zet status naar halt om nieuwe RCONTEXTEN te voorkomen
+                return False  # NACK: Onvoldoende uCores beschikbaar
+
+            # 3. Wek de hoofd-pijplijn op en stel de Program Counter in
             self.cpu.PC = target_pc
             self.cpu.fsm_state = "FETCH"
-            return True
+            return True  # ACK!
 
         elif cmd == CMD_SYNC:
             # Geef READY (True) alleen als deze CPU 100% idle is (alle 32 cores vrij)
