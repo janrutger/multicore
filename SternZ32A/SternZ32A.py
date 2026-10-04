@@ -45,13 +45,22 @@ class SternZ32Mainboard:
         ChannelLink(self.cpus[0].ciu, 3, self.cpus[4].ciu, 0)   
 
         ChannelLink(self.cpus[1].ciu, 1, self.cpus[2].ciu, 1)
-        ChannelLink(self.cpus[1].ciu, 2, self.cpus[3].ciu, 1)
-        ChannelLink(self.cpus[1].ciu, 3, self.cpus[4].ciu, 1)
+        # ChannelLink(self.cpus[1].ciu, 2, self.cpus[3].ciu, 1)
+        # ChannelLink(self.cpus[1].ciu, 3, self.cpus[4].ciu, 1)
 
-        ChannelLink(self.cpus[2].ciu, 2, self.cpus[3].ciu, 2)
-        ChannelLink(self.cpus[2].ciu, 3, self.cpus[4].ciu, 2)
+        # ChannelLink(self.cpus[2].ciu, 2, self.cpus[3].ciu, 2)
+        # ChannelLink(self.cpus[2].ciu, 3, self.cpus[4].ciu, 2)
 
-        ChannelLink(self.cpus[3].ciu, 3, self.cpus[4].ciu, 3)
+        ChannelLink(self.cpus[3].ciu, 3, self.cpus[4].ciu, 1)
+
+        # Uitbreiding naar 9 [0 .. 8] cpu's
+        ChannelLink(self.cpus[1].ciu, 2, self.cpus[5].ciu, 0)
+        # ChannelLink(self.cpus[1].ciu, 3, self.cpus[6].ciu, 0)
+
+        ChannelLink(self.cpus[4].ciu, 2, self.cpus[7].ciu, 0)
+        ChannelLink(self.cpus[4].ciu, 3, self.cpus[8].ciu, 0)
+        
+
 
 
         # =========================================================================
@@ -217,6 +226,16 @@ class SternZ32Mainboard:
         self.root.after(0, self.gameloop)
 
     def print_eindrapportage(self, totale_tijd, khz):
+        # Optellen van alle CPU-componenten
+        tot_ucore = sum(cpu.time_ucore for cpu in self.cpus)
+        tot_gc = sum(cpu.time_gc for cpu in self.cpus)
+        tot_context = sum(cpu.time_context for cpu in self.cpus)
+        tot_main = sum(cpu.time_main for cpu in self.cpus)
+
+        sum_cpu_time = tot_ucore + tot_gc + tot_context + tot_main
+        # Wat overblijft is de tijd besteed aan Tkinter GUI, event loops, canvas updates en OS overhead
+        time_gui_and_overhead = max(0.0, totale_tijd - sum_cpu_time)
+
         """Drukt de eindrapportage af van het gehele systeem."""
         print("\n==========================================================")
         print("             SIMULATIE SUCCESVOL BEËINDIGD                ")
@@ -227,12 +246,59 @@ class SternZ32Mainboard:
         print(f"Snelheid:     {khz:.2f} kHz op de host machine.")
         print("==========================================================\n")
 
+        print("\n==========================================================")
+        print("             SternZ32 HARDWARE PROFILING REPORT            ")
+        print("==========================================================")
+        print(f"Totale Verstreken Tijd (Wall-Clock) : {totale_tijd:8.2f} s  (100.0%)")
+        print("----------------------------------------------------------")
+        print(f"1. uCore Compute Matrix             : {tot_ucore:8.2f} s  ({(tot_ucore/totale_tijd)*100:5.1f}%)")
+        print(f"2. Garbage Collection (Wezen-check) : {tot_gc:8.2f} s  ({(tot_gc/totale_tijd)*100:5.1f}%)")
+        print(f"3. Context Threads (Scheduler)      : {tot_context:8.2f} s  ({(tot_context/totale_tijd)*100:5.1f}%)")
+        print(f"4. Main CPU Pipelines               : {tot_main:8.2f} s  ({(tot_main/totale_tijd)*100:5.1f}%)")
+        print("----------------------------------------------------------")
+        print(f"5. Tkinter GUI & Simulator Overhead : {time_gui_and_overhead:8.2f} s  ({(time_gui_and_overhead/totale_tijd)*100:5.1f}%)")
+        print("==========================================================\n")
+
+        # for cpu in self.cpus:
+        #     print(
+        #         f"\033[92m--- EINDSTATUS CPU {cpu.ID} (Vrije Cores:"
+        #         f" {len(cpu.free_cores)}/32) ---"
+        #     )
+        #     print(f"  FSM State: {cpu.fsm_state} | PC: {cpu.PC}\033[0m")
+        print("==========================================================")
+        print("               PER-CPU STATUS & PROFILING                 ")
+        print("==========================================================")
         for cpu in self.cpus:
+            # Bereken totale executietijd op deze specifieke CPU
+            cpu_total_time = cpu.time_ucore + cpu.time_gc + cpu.time_context + cpu.time_main
+            safe_cpu_tot = cpu_total_time if cpu_total_time > 0 else 0.0001  # Voorkom DivisionByZero
+
             print(
-                f"\033[92m--- EINDSTATUS CPU {cpu.ID} (Vrije Cores:"
+                f"  s--- EINDSTATUS CPU {cpu.ID} (Vrije Cores:"
                 f" {len(cpu.free_cores)}/32) ---"
             )
-            print(f"  FSM State: {cpu.fsm_state} | PC: {cpu.PC}\033[0m")
+            print(
+                f"  FSM State: {cpu.fsm_state:<13} | PC: {cpu.PC:<4} |"
+                f" Actieve Tijd: {cpu_total_time:6.2f} "
+            )
+            print(
+                f"  ├─ uCore Matrix     : {cpu.time_ucore:6.2f} s "
+                f" ({(cpu.time_ucore/safe_cpu_tot)*100:5.1f}% van CPU-tijd)"
+            )
+            print(
+                f"  ├─ GC (Wezen-check) : {cpu.time_gc:6.2f} s "
+                f" ({(cpu.time_gc/safe_cpu_tot)*100:5.1f}% van CPU-tijd)"
+            )
+            print(
+                f"  ├─ CTX Scheduler    : {cpu.time_context:6.2f} s "
+                f" ({(cpu.time_context/safe_cpu_tot)*100:5.1f}% van CPU-tijd)"
+            )
+            print(
+                f"  └─ Main Pipeline    : {cpu.time_main:6.2f} s "
+                f" ({(cpu.time_main/safe_cpu_tot)*100:5.1f}% van CPU-tijd)\n"
+            )
+        print("==========================================================\n")
+
 
         print("\n==========================================================")
         print("          SHARED GEHEUGEN DUMP (Adres 1024 t/m 1033)      ")

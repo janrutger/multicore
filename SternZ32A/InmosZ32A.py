@@ -2,6 +2,7 @@
 # Start of the new Context based parrallel CPU
 
 from collections import deque
+import time
 from CIUcontrollerV2 import CIU  # <-- 1. IMPORT CIU CONTROLLER
 # from memory import Memory
 from memoryMMU import MMU 
@@ -15,10 +16,17 @@ from opcodes import Op, FORMAT_ZERO, FORMAT_ONE_ADDR, FORMAT_ONE_REG, FORMAT_TWO
 
 class CPU:
     def __init__(self, cpu_id=0, memory=None):
-        # self.memory = Memory(size=1024)
-        # self.memory = Memory(Page0=1024, Private=512, Shared=1024, block_size=64)
+        ## Hardeware countertimers
+        self.time_ucore = 0.0      # Pure uCore microsteps
+        self.time_gc = 0.0         # Garbage collection ("wezen check")
+        self.time_context = 0.0    # RCONTEXT thread scheduler
+        self.time_main = 0.0       # Hoofd-CPU pipeline execution
+
         self.ID = cpu_id
         self.parent_id = cpu_id
+
+        # self.memory = Memory(size=1024)
+        # self.memory = Memory(Page0=1024, Private=512, Shared=1024, block_size=64)
         # Als er geen MMU wordt meegegeven, maken we een stand-alone instantie aan.
         # Als er wél een MMU wordt meegegeven (zoals door het Mainboard), gebruiken we die!
         self.memory = (
@@ -81,84 +89,177 @@ class CPU:
         print("[CPU] Inmos-Z32: IO-Controller succesvol gekoppeld via interne bus.")
 
 
-    def tick(self):
-            """Voert één volledige kloksnelheid-cyclus uit voor het hele systeem."""
+    # def tick(self):
+    #         """Voert één volledige kloksnelheid-cyclus uit voor het hele systeem."""
             
-            # 1. Geef alle cores in de matrix de ruimte om hun microstep te doen
-            for core_id, core in enumerate(self.cores):
-                core.tick()
+    #         # 1. Geef alle cores in de matrix de ruimte om hun microstep te doen
+            
+    #         for core_id, core in enumerate(self.cores):
+    #             t0 = time.perf_counter()
+    #             core.tick()
 
-                # --- STAP A: Geef de reeds IDLE cores terug aan de wachtrij ---
-                if core.coreStatus == 'IDLE' and core_id not in self.free_cores:
-                    self.free_cores.append(core_id)
+    #             # --- STAP A: Geef de reeds IDLE cores terug aan de wachtrij ---
+    #             if core.coreStatus == 'IDLE' and core_id not in self.free_cores:
+    #                 self.free_cores.append(core_id)
+    #             t1 = time.perf_counter()
+    #             self.time_ucore += (t1 - t0)
 
-
-                # --- STAP B: CONTROLEER OP WEZEN (DRAAD-VEILIGE GARBAGE COLLECTION) ---
-                if core.coreStatus == 'VALID':
-                    # 1. Check Master CPU registers
-                    in_master_register = any(reg_id == core_id for reg_id in self.registers.values())
+    #             # --- STAP B: CONTROLEER OP WEZEN (DRAAD-VEILIGE GARBAGE COLLECTION) ---
+    #             tb = time.perf_counter()
+    #             if core.coreStatus == 'VALID':
+    #                 # 1. Check Master CPU registers
+    #                 in_master_register = any(reg_id == core_id for reg_id in self.registers.values())
                     
-                    # 2. Check ALLE threads die nog in het systeem zitten (ongeacht FSM status!)
-                    in_thread_register = False
-                    for ctx in self.contexts:
-                        if any(reg_id == core_id for reg_id in ctx.registers.values()):
-                            in_thread_register = True
-                            break
+    #                 # 2. Check ALLE threads die nog in het systeem zitten (ongeacht FSM status!)
+    #                 in_thread_register = False
+    #                 for ctx in self.contexts:
+    #                     if any(reg_id == core_id for reg_id in ctx.registers.values()):
+    #                         in_thread_register = True
+    #                         break
                             
-                    is_test_core = (self.last_test_core == core_id)
+    #                 is_test_core = (self.last_test_core == core_id)
                     
-                    # 3. Check of er een WORKING core is die deze core nodig heeft
-                    wordt_nog_bezocht = False
-                    for andere_core in self.cores:
-                        if andere_core.coreStatus == 'WORKING':
-                            if andere_core.arg1 == core_id or andere_core.arg2 == core_id:
-                                wordt_nog_bezocht = True
-                                break
+    #                 # 3. Check of er een WORKING core is die deze core nodig heeft
+    #                 wordt_nog_bezocht = False
+    #                 for andere_core in self.cores:
+    #                     if andere_core.coreStatus == 'WORKING':
+    #                         if andere_core.arg1 == core_id or andere_core.arg2 == core_id:
+    #                             wordt_nog_bezocht = True
+    #                             break
                     
-                    # Alleen slopen als hij écht door helemaal niemand meer geclaimd wordt
-                    if not in_master_register and not in_thread_register and not is_test_core and not wordt_nog_bezocht:
-                        core.coreStatus = 'IDLE'
+    #                 # Alleen slopen als hij écht door helemaal niemand meer geclaimd wordt
+    #                 if not in_master_register and not in_thread_register and not is_test_core and not wordt_nog_bezocht:
+    #                     core.coreStatus = 'IDLE'
+    #             t1 = time.perf_counter()
+    #             self.time_gc += (t1 - tb)
 
 
-            # 2. CONTEXT SCHEDULER: Slimme dubbele tick bij FETCH
+    #         # 2. CONTEXT SCHEDULER: Slimme dubbele tick bij FETCH
+    #         t0 = time.perf_counter()
+    #         active_running_contexts = [c for c in self.contexts if c.fsm_state in ('FETCH', 'DECODE', 'EXECUTE', 'RUNNING')]
             
-            active_running_contexts = [c for c in self.contexts if c.fsm_state in ('FETCH', 'DECODE', 'EXECUTE', 'RUNNING')]
-            
-            if active_running_contexts:
-                # Veiligheidsmarge: mocht de lijst gekrompen zijn, zorg dat we nooit Out-of-Bounds gaan
-                if self.current_context_index >= len(active_running_contexts):
-                    self.current_context_index = 0
+    #         if active_running_contexts:
+    #             # Veiligheidsmarge: mocht de lijst gekrompen zijn, zorg dat we nooit Out-of-Bounds gaan
+    #             if self.current_context_index >= len(active_running_contexts):
+    #                 self.current_context_index = 0
                     
-                target_context = active_running_contexts[self.current_context_index]
+    #             target_context = active_running_contexts[self.current_context_index]
 
-                # --- DEBUG PRINT: TOON EXECUTIE VAN CONTEXT OP CPU ---
-                # print(
-                #     f"\033[36m[CTX TICK CPU{self.ID}] Thread"
-                #     f" #{self.current_context_index + 1}/{len(active_running_contexts)}"
-                #     f" | State: {target_context.fsm_state:<7} | PC:"
-                #     f" {target_context.PC:<3}\033[0m"
-                # )
+    #             # --- DEBUG PRINT: TOON EXECUTIE VAN CONTEXT OP CPU ---
+    #             # print(
+    #             #     f"\033[36m[CTX TICK CPU{self.ID}] Thread"
+    #             #     f" #{self.current_context_index + 1}/{len(active_running_contexts)}"
+    #             #     f" | State: {target_context.fsm_state:<7} | PC:"
+    #             #     f" {target_context.PC:<3}\033[0m"
+    #             # )
 
                 
-                # --- JOUW ELEGANTE LOGICA ---
-                if target_context.fsm_state == 'FETCH':
-                    # Run 2 ticks: Fetch pakt de instructie, de 2e tick voert DECODE direct uit!
-                    self._execute_cycle(self, target_context)
-                    self._execute_cycle(self, target_context)
-                else:
-                    # Run 1 tick: Voor DECODE, EXECUTE of hardware stalls
-                    self._execute_cycle(self, target_context)
+    #             # --- JOUW ELEGANTE LOGICA ---
+    #             if target_context.fsm_state == 'FETCH':
+    #                 # Run 2 ticks: Fetch pakt de instructie, de 2e tick voert DECODE direct uit!
+    #                 self._execute_cycle(self, target_context)
+    #                 self._execute_cycle(self, target_context)
+    #             else:
+    #                 # Run 1 tick: Voor DECODE, EXECUTE of hardware stalls
+    #                 self._execute_cycle(self, target_context)
             
-                # Schuif de Round Robin pointer netjes door
-                self.current_context_index = (self.current_context_index + 1) % len(active_running_contexts)
+    #             # Schuif de Round Robin pointer netjes door
+    #             self.current_context_index = (self.current_context_index + 1) % len(active_running_contexts)
+    #         t1 = time.perf_counter()
+    #         self.time_context += (t1 - t0)
 
+    #         # Als de CPU in WAIT_FOR_WORK staat, doet de klok cyclus niks
+    #         if self.fsm_state == "WAIT_FOR_WORK":
+    #             return
 
-            # Als de CPU in WAIT_FOR_WORK staat, doet de klok cyclus niks
-            if self.fsm_state == "WAIT_FOR_WORK":
-                return
+    #         # 3. Voer DAARNA de huidige hoofd-CPU instructie uit
+    #         t0 = time.perf_counter()
+    #         self._execute_cycle(self, self)
+    #         t1 = time.perf_counter()
+    #         self.time_main += (t1 - t0)
+    def tick(self):
+        """Voert één volledige kloksnelheid-cyclus uit voor het hele systeem."""
+        
+        # ==========================================================
+        # 1. uCORE MATRIX TICKS (Eén meting voor álle cores samen)
+        # ==========================================================
+        t0 = time.perf_counter()
+        for core_id, core in enumerate(self.cores):
+            core.tick()
 
-            # 3. Voer DAARNA de huidige hoofd-CPU instructie uit
-            self._execute_cycle(self, self)
+            # --- STAP A: Geef de reeds IDLE cores terug aan de wachtrij ---
+            if core.coreStatus == 'IDLE' and core_id not in self.free_cores:
+                self.free_cores.append(core_id)
+                
+        t1 = time.perf_counter()
+        self.time_ucore += (t1 - t0)
+
+        # ==========================================================
+        # 2. GARBAGE COLLECTION / WEZEN-CHECK (Eén meting voor de hele check)
+        # ==========================================================
+        t0 = time.perf_counter()
+        for core_id, core in enumerate(self.cores):
+            if core.coreStatus == 'VALID':
+                # 1. Check Master CPU registers
+                in_master_register = any(reg_id == core_id for reg_id in self.registers.values())
+                
+                # 2. Check ALLE threads die nog in het systeem zitten (ongeacht FSM status!)
+                in_thread_register = False
+                for ctx in self.contexts:
+                    if any(reg_id == core_id for reg_id in ctx.registers.values()):
+                        in_thread_register = True
+                        break
+                        
+                is_test_core = (self.last_test_core == core_id)
+                
+                # 3. Check of er een WORKING core is die deze core nodig heeft
+                wordt_nog_bezocht = False
+                for andere_core in self.cores:
+                    if andere_core.coreStatus == 'WORKING':
+                        if andere_core.arg1 == core_id or andere_core.arg2 == core_id:
+                            wordt_nog_bezocht = True
+                            break
+                
+                # Alleen slopen als hij énkel door helemaal niemand meer geclaimd wordt
+                if not in_master_register and not in_thread_register and not is_test_core and not wordt_nog_bezocht:
+                    core.coreStatus = 'IDLE'
+                    
+        t1 = time.perf_counter()
+        self.time_gc += (t1 - t0)
+
+        # ==========================================================
+        # 3. CONTEXT SCHEDULER (RCONTEXT THREADS)
+        # ==========================================================
+        t0 = time.perf_counter()
+        active_running_contexts = [c for c in self.contexts if c.fsm_state in ('FETCH', 'DECODE', 'EXECUTE', 'RUNNING')]
+        
+        if active_running_contexts:
+            if self.current_context_index >= len(active_running_contexts):
+                self.current_context_index = 0
+                
+            target_context = active_running_contexts[self.current_context_index]
+
+            if target_context.fsm_state == 'FETCH':
+                self._execute_cycle(self, target_context)
+                self._execute_cycle(self, target_context)
+            else:
+                self._execute_cycle(self, target_context)
+        
+            self.current_context_index = (self.current_context_index + 1) % len(active_running_contexts)
+            
+        t1 = time.perf_counter()
+        self.time_context += (t1 - t0)
+
+        # ==========================================================
+        # 4. HOOFD-CPU PIPELINE
+        # ==========================================================
+        if self.fsm_state == "WAIT_FOR_WORK":
+            return
+
+        t0 = time.perf_counter()
+        self._execute_cycle(self, self)
+        t1 = time.perf_counter()
+        self.time_main += (t1 - t0)
 
 
 

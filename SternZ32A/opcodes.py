@@ -67,7 +67,6 @@ class Op(IntEnum):
     # --- CIU MAILBOX API (FORMAT: TWO_REG_REG) ---
     MSG_START = 83  # msg_start Rx, Ry (Rx = TAG, Ry = SIZE -> TxSlotID)
     MSG_WRITE = 84  # msg_write Ry, Rx (Ry = TxSlotID, Rx = Value)
-    MSG_PROBE = 87  # msg_probe Ry, Rx (Ry = RxSlotID, Rx <- TAG)
     MSG_READ  = 88  # msg_read Ry, Rx  (Ry = RxSlotID, Rx <- Data)
     
 
@@ -85,6 +84,7 @@ class Op(IntEnum):
     # --- CIU MAILBOX API (FORMAT: ONE_REG) ---
     MSG_DONE  = 85  # msg_done Ry      (Ry = TxSlotID)
     MSG_OPEN  = 86  # msg_open Rx      (Rx <- RxSlotID)
+    MSG_PROBE = 87  # msg_probe Rx     (Rx <- TAG)
     MSG_CLOSE = 89  # msg_close Ry     (Ry = RxSlotID)
 
 # Vaste sets voor de decoder om snel het format te matchen
@@ -92,17 +92,17 @@ FORMAT_ZERO        = {Op.NOP, Op.HALT, Op.CLOSE, Op.IOSYNC, Op.AUTOCLOSE, Op.SUS
 FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.SUCCES, Op.FAIL, Op.SYNC, Op.ALLSYNC}
 FORMAT_ONE_REG     = {
     Op.INC, Op.DEC, Op.TSTZ, Op.CPUID, Op.PID,
-    Op.MSG_DONE, Op.MSG_OPEN, Op.MSG_CLOSE
+    Op.MSG_DONE, Op.MSG_OPEN, Op.MSG_CLOSE, Op.MSG_PROBE
 }
 FORMAT_TWO_REG_REG = {
     Op.LD, Op.ADD, Op.SUB, Op.MUL, Op.MOD, Op.DIV, Op.TSTE, Op.TSTG, Op.XOR,
-    Op.MSG_START, Op.MSG_WRITE, Op.MSG_PROBE, Op.MSG_READ
+    Op.MSG_START, Op.MSG_WRITE, Op.MSG_READ
 }
 FORMAT_TWO_REG_VAL = {
     Op.LDI, Op.LDM, Op.LDX, Op.OUT, Op.IN, Op.STO, Op.STX, 
     Op.SHIFTL, Op.SHIFTR, Op.ROTL32, Op.SM32_RND, Op.CONTEXT, Op.JOIN, 
     Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI, Op.RCONTEXT,
-    Op.RBOOT,  
+    Op.RBOOT, 
 }
 
 

@@ -244,19 +244,55 @@ class CIU:
         self.cpu.status = 1
         return rx_id
 
-    def msg_probe(self, ry_read_slot_id):
-        """msg_probe Ry Rx
-        Ry = Actieve read_slotID.
-        Retourneert de Message TAG (in te stellen in Rx).
-        """
-        if ry_read_slot_id not in self.rx_slots:
-            self.cpu.status = 0
-            return 0
+    # def msg_probe(self, ry_read_slot_id):
+    #     """msg_probe Ry Rx
+    #     Ry = Actieve read_slotID.
+    #     Retourneert de Message TAG (in te stellen in Rx).
+    #     """
+    #     if ry_read_slot_id not in self.rx_slots:
+    #         self.cpu.status = 0
+    #         return 0
 
-        fifo_idx = self.rx_slots[ry_read_slot_id]["fifo_index"]
-        tag = self.mailbox[fifo_idx]["msg_tag"]  # <--- LEEST DE TAG UIT ENVELOP HEADER
-        self.cpu.status = 1
-        return tag
+    #     fifo_idx = self.rx_slots[ry_read_slot_id]["fifo_index"]
+    #     tag = self.mailbox[fifo_idx]["msg_tag"]  # <--- LEEST DE TAG UIT ENVELOP HEADER
+    #     self.cpu.status = 1
+    #     return tag
+    # def msg_probe(self):
+    #     """
+    #     msg_probe Rx
+    #     Inspecteert de header op de actuele read_pointer ZONDER de FIFO-status
+    #     om te zetten naar READING of de read_pointer te verplaatsen.
+        
+    #     - Sets self.cpu.status = True indien VALID bericht aanwezig.
+    #     - Sets self.cpu.status = False indien FIFO leeg of slot in WRITING.
+    #     - Retourneert de msg_tag (voor opslag in Rx).
+    #     """
+    #     slot = self.mailbox[self.read_pointer]
+
+    #     if slot["status"] != "VALID":
+    #         self.cpu.status = False
+    #         return 0
+
+    #     self.cpu.status = True
+    #     return slot["msg_tag"]
+    def msg_probe(self, expected_tag):
+        """
+        msg_probe Rx
+        Hardware Tag Match (Zero-Commit Inspection):
+        - Controleert of er op de read_pointer een VALID bericht staat.
+        - Vergelijkt de msg_tag in de header met expected_tag.
+        - Sets self.cpu.status = True ALLEEN als het bericht VALID is én de TAG matcht.
+        - Sets self.cpu.status = False in alle andere gevallen.
+        - Consumeert NUL FIFO-slots en verandert de read_pointer NIET.
+        """
+        slot = self.mailbox[self.read_pointer]
+
+        if slot["status"] == "VALID" and slot["msg_tag"] == expected_tag:
+            self.cpu.status = True
+            return True
+
+        self.cpu.status = False
+        return False
 
     def msg_read(self, ry_read_slot_id):
         """msg_read Ry Rx
@@ -399,18 +435,18 @@ class CIU:
             if slot["status"] == "WRITING":
                 slot["status"] = "VALID"
 
-            # === DEBUG LOGGING VOOR VALIDATED MAILBOX SLOT ===
-            cpu_id = getattr(self.cpu, 'ID', '?')
-            sender = slot['sender_cpuid']
-            tag    = slot['msg_tag']
-            size   = slot['msg_size']
+            # # === DEBUG LOGGING VOOR VALIDATED MAILBOX SLOT ===
+            # cpu_id = getattr(self.cpu, 'ID', '?')
+            # sender = slot['sender_cpuid']
+            # tag    = slot['msg_tag']
+            # size   = slot['msg_size']
 
-            # \033[36m geeft een heldere cyaan/cyan kleur in de terminal
-            print(
-                f"\033[36m[CIU MAILBOX CPU {cpu_id}] 📩 Slot #{write_ptr:03d} "
-                f"gevalideerd -> VALID | Afzender: CPU {sender} | "
-                f"TAG: {tag} | Size: {size} datawoord(en)\033[0m"
-            )
+            # # \033[36m geeft een heldere cyaan/cyan kleur in de terminal
+            # print(
+            #     f"\033[36m[CIU MAILBOX CPU {cpu_id}] 📩 Slot #{write_ptr:03d} "
+            #     f"gevalideerd -> VALID | Afzender: CPU {sender} | "
+            #     f"TAG: {tag} | Size: {size} datawoord(en)\033[0m"
+            # )
             ### END DEBUG
 
             return True

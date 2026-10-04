@@ -14,13 +14,27 @@ MAP {
     SHARED parent_cpu_id 1
     SHARED message_tag 1
     SHARED message_payload 1
+    SHARED message_payload2 1
+    SHARED message_cpu0 1
+
+    CONST tag 101
 }
 
 PROGRAM {
 main:
-    2 -> A                 ; Channel ID 2 (CPU 2)
+    3 -> A                 ; Channel ID 2 (CPU 2)
     RBOOT A CPU_WORKER
 
+leeslus:
+    102 -> B
+    READ B (K) {
+        K -> [message_cpu0]
+        JMP einde
+    }
+    JMP leeslus
+
+
+einde:
     HALT
 
 
@@ -41,22 +55,28 @@ CPU_WORKER:
 
 ;--- MAILBOX ONTVANGST LUS IN CPU_WORKER ---
 RECEIVE_LOOP:
-    MSG_OPEN A             ; Probeer inkomend bericht te openen (A ontvangt read_slotID)
-    FAIL RECEIVE_LOOP    ; Geen VALID bericht klaar? Spring naar RECEIVE_LOOP
 
-    ; A bevat nu het actieve read_slotID
-    MSG_PROBE A, B         ; B ontvangt de TAG (101) uit de header
-    B -> [message_tag]
+    tag -> B    ; TAG in B
+    READ B (A, C) {
+        A -> [message_payload]
+        C -> [message_payload2]
+        ; JMP END_WORKER
+    }
 
-    MSG_READ A, C          ; C ontvangt het berekende datawoord (1764)
-    C -> [message_payload]
+    102 -> B
+    READ B (A){
+        WRITE B (A)         ; stuur door naar CPU0
+        ; JMP END_WORKER
+    }
 
-    MSG_CLOSE A            ; Geef het FIFO-slot vrij op FREE / EMPTY
-    JMP END_WORKER
+    999 -> B
+    READ B () {
+        JMP END_WORKER
+    }
+
+    JMP RECEIVE_LOOP
 
    
-
-
 END_WORKER:
     SUSPEND
 
@@ -72,13 +92,18 @@ R_CONTEXT:
     PID B
     B -> [parent_cpu_id]
 
-    ;--- VERSTUUR BEREKENING VIA MAILBOX NAAR PARENT CPU ---
-    101 -> B               ; B = TAG 101 (Event ID: Rekenresultaat)
-    1 -> C                 ; C = Message Size (1 datawoord)
+    1967 -> C
 
-    MSG_START B, C         ; C ontvangt tx_slotID (gaat automatisch naar PID!)
-    MSG_WRITE C, A         ; Schrijf de berekende waarde 1764 (A)
-    MSG_DONE C             ; Valideer het bericht op de Parent CPU (status -> VALID)
+    ;--- VERSTUUR BEREKENING VIA MAILBOX NAAR PARENT CPU ---
+    tag -> B               ; B = TAG 101 (Event ID: Rekenresultaat)
+    WRITE B (A, C)
+
+
+    102 -> B
+    WRITE B (C)
+
+    999 -> B
+    WRITE B ()
 
     AUTOCLOSE
 }

@@ -33,6 +33,7 @@ class ZScriptExpander(Transformer):
         self.start_label = None
         self.loop_counter = 0
         self.macro_call_counter = 0
+        self.label_counter = 0
         self.spawn_counter = 0
 
     def _initialize_allocator(self):
@@ -797,6 +798,110 @@ class ZScriptExpander(Transformer):
         asm.append(f"; --- IF STATEMENT END ---")
 
         return "\n".join(asm)
+
+    ## WRITE en READ expansie
+    def _generate_unique_label(self, prefix="_SKIP_READ"):
+        self.label_counter += 1
+        return f"{prefix}_{self.label_counter}"
+
+    def write_stmt(self, tree_or_list):
+        """
+        ZScripting: WRITE C (A, B)
+        """
+        # Veilig uitpakken: ondersteunt zowel Transformer (list) als Visitor (Tree)
+        children = tree_or_list.children if hasattr(tree_or_list, 'children') else tree_or_list
+        
+        # children[0] = WRITE_KEYWORD ("WRITE")
+        # children[1] = REGISTER (bijv. 'B')
+        # children[2] = arg_list knoop
+        tag_reg = str(children[1]).strip()
+        
+        arg_node = children[2] if len(children) > 2 else None
+        payload_args = []
+        
+        if arg_node is not None:
+            if hasattr(arg_node, 'children'):
+                payload_args = [str(c).strip() for c in arg_node.children if c is not None]
+            elif isinstance(arg_node, list):
+                payload_args = [str(c).strip() for c in arg_node if c is not None]
+            else:
+                payload_args = [str(arg_node).strip()]
+
+        n_args = len(payload_args)
+        asm_output = []
+        
+        # 1. Aantal argumenten (SIZE) in register I
+        asm_output.append(f"    LDI I, {n_args}")
+        
+        # 2. Transactie start: C = TAG, I = SIZE -> I ontvangt tx_slotID
+        asm_output.append(f"    MSG_START {tag_reg}, I")
+        
+        # 3. Payload schrijven via handle I
+        for arg in payload_args:
+            asm_output.append(f"    MSG_WRITE I, {arg}")
+            
+        # 4. Transactie valideren
+        asm_output.append("    MSG_DONE I")
+        
+        return "\n".join(asm_output)
+
+    def read_stmt(self, tree_or_list):
+        """
+        ZScripting: READ B (A) { body }
+        """
+        # Veilig uitpakken: ondersteunt zowel Transformer (list) als Visitor (Tree)
+        children = tree_or_list.children if hasattr(tree_or_list, 'children') else tree_or_list
+        
+        # children[0] = READ_KEYWORD ("READ")
+        # children[1] = REGISTER (bijv. 'B')
+        # children[2] = arg_list knoop
+        # children[3:] = verwerkte regels van het body-blok
+        tag_reg = str(children[1]).strip()
+        
+        arg_node = children[2] if len(children) > 2 else None
+        payload_args = []
+        
+        if arg_node is not None:
+            if hasattr(arg_node, 'children'):
+                payload_args = [str(c).strip() for c in arg_node.children if c is not None]
+            elif isinstance(arg_node, list):
+                payload_args = [str(c).strip() for c in arg_node if c is not None]
+            else:
+                payload_args = [str(arg_node).strip()]
+
+        body_items = children[3:] if len(children) > 3 else []
+        
+        skip_label = self._generate_unique_label()
+        asm_output = []
+
+        # 1. Non-destructive Peeking: MSG_PROBE Rx
+        asm_output.append(f"    MSG_PROBE {tag_reg}")
+        asm_output.append(f"    FAIL {skip_label}")  # Geen VALID bericht? Spring over het blok
+
+        # 2. Commit & Claim slot in Register I
+        asm_output.append("    MSG_OPEN I")
+
+        # 3. Payload uitlezen naar de opgegeven registers
+        for arg in payload_args:
+            asm_output.append(f"    MSG_READ I, {arg}")
+
+        # 3a. Gegarandeerde sluiting van het slot
+        asm_output.append("    MSG_CLOSE I")
+
+        # 4. Inhoud van het body-blok invoegen
+        for item in body_items:
+            if item is not None:
+                item_str = str(item).strip()
+                if item_str:
+                    asm_output.append(f"        {item_str}")
+
+        # # 5. Gegarandeerde sluiting van het slot
+        # asm_output.append("    MSG_CLOSE I")
+
+        # 6. Uniek label toevoegen voor de spring-target
+        asm_output.append(f"{skip_label}:")
+
+        return "\n".join(asm_output)
 
     
     def arg_list(self, items):

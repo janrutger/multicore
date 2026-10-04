@@ -858,24 +858,50 @@ def _execute_cycleZ32(master_cpu, target):
             master_cpu.cores[core_id].dispatch('ldv')
             target.registers[reg1] = core_id
 
-        elif opcode == Op.MSG_PROBE:
-            # msg_probe Ry, Rx  (reg1 = Ry [read_slotID], arg2 = Rx [Ontvangt TAG])
-            ry_core_id = target.registers[reg1]
+        # elif opcode == Op.MSG_PROBE:
+        #     # msg_probe Ry, Rx  (reg1 = Ry [read_slotID], arg2 = Rx [Ontvangt TAG])
+        #     ry_core_id = target.registers[reg1]
 
-            if ry_core_id is None: return
-            core_ry = master_cpu.cores[ry_core_id]
-            if core_ry.coreStatus != 'VALID':
+        #     if ry_core_id is None: return
+        #     core_ry = master_cpu.cores[ry_core_id]
+        #     if core_ry.coreStatus != 'VALID':
+        #         return  # STALL
+
+        #     if not master_cpu.free_cores: return  # STALL voor destination uCore
+
+        #     read_id = core_ry.value
+        #     tag_val = master_cpu.ciu.msg_probe(read_id)
+        # elif opcode == Op.MSG_PROBE:
+        #     # msg_probe Rx      (reg1 = Rx [Ontvangt geïnspecteerde TAG van read_pointer])
+        #     if not master_cpu.free_cores: return  # STALL voor destination uCore
+
+        #     tag_val = master_cpu.ciu.msg_probe()
+
+        #     # Ken een uCore toe om de uitgelezen TAG op te slaan in register Rx (reg1)
+        #     core_id = master_cpu.free_cores.popleft()
+        #     master_cpu.cores[core_id].transfer = tag_val
+        #     master_cpu.cores[core_id].dispatch('ldv')
+        #     target.registers[reg1] = core_id
+
+        #     core_id = master_cpu.free_cores.popleft()
+        #     master_cpu.cores[core_id].transfer = tag_val
+        #     master_cpu.cores[core_id].dispatch('ldv')
+        #     target.registers[arg2] = core_id
+        elif opcode == Op.MSG_PROBE:
+            # msg_probe Rx  (reg1 = Rx [Bevat de VERWACHTE TAG])
+            rx_core_id = target.registers[reg1]
+
+            # 1. Wacht tot de uCore met de verwachte TAG de status 'VALID' heeft (Stall)
+            if rx_core_id is None: return
+            core_rx = master_cpu.cores[rx_core_id]
+            if core_rx.coreStatus != 'VALID':
                 return  # STALL
 
-            if not master_cpu.free_cores: return  # STALL voor destination uCore
+            expected_tag = core_rx.value
 
-            read_id = core_ry.value
-            tag_val = master_cpu.ciu.msg_probe(read_id)
-
-            core_id = master_cpu.free_cores.popleft()
-            master_cpu.cores[core_id].transfer = tag_val
-            master_cpu.cores[core_id].dispatch('ldv')
-            target.registers[arg2] = core_id
+            # 2. Voer Hardware Tag Match uit op de CIU (stelt zelf self.cpu.status in!)
+            # NUL uCores nodig voor het opslaan van resultaten!
+            master_cpu.ciu.msg_probe(expected_tag)
 
         elif opcode == Op.MSG_READ:
             # msg_read Ry, Rx   (reg1 = Ry [read_slotID], arg2 = Rx [Ontvangt DATA])
