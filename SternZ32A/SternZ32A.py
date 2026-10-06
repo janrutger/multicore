@@ -49,7 +49,7 @@ class SternZ32Mainboard:
         # ChannelLink(self.cpus[1].ciu, 3, self.cpus[4].ciu, 1)
 
         # ChannelLink(self.cpus[2].ciu, 2, self.cpus[3].ciu, 2)
-        # ChannelLink(self.cpus[2].ciu, 3, self.cpus[4].ciu, 2)
+        # ChannelLink(self.cpus[2].ciu, 3, self.cpus[5].ciu, 2)
 
         ChannelLink(self.cpus[3].ciu, 3, self.cpus[4].ciu, 1)
 

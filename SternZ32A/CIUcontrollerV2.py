@@ -146,7 +146,14 @@ class CIU:
         Ry = Message Size
         parent_id = Het Parent CPU ID waar het bericht automatisch naartoe gaat.
         """
-        neighbor_ciu = self._find_neighbor_ciu(parent_id)
+        #neighbor_ciu = self._find_neighbor_ciu(parent_id)
+
+        my_id = getattr(self.cpu, 'ID', 0)
+        # 1. ROUTING CHECK: Is het bericht lokaal (voor de eigen CPU) of voor een externe buur?
+        if parent_id == my_id:
+            neighbor_ciu = self  # Lokaal bericht naar de eigen Mailbox!
+        else:
+            neighbor_ciu = self._find_neighbor_ciu(parent_id)
         
         if neighbor_ciu is None:
             raise RuntimeError(

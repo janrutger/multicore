@@ -518,29 +518,33 @@ def _execute_cycleZ32(master_cpu, target):
 
 
         elif opcode == Op.CONTEXT:
-            # Alleen de hoofd-CPU (master) mag threads (contexts) spawnen
+            # Alleen de hoofd-CPU (master van dit executie-domein) mag sub-threads spawnen
             if target != master_cpu:
                 raise RuntimeError("Hardware Fault: Een sub-context probeerde zelf een CONTEXT te spawnen!")
                 
-            # 1. HARDWARE HIGH-WATERMARK CHECK: 
-            # We hebben maximaal 10 cores per context nodig, om deadlocks te voorkomen een highwater mark van 10!
+            # 1. VALIDEER SOURCE uCORE (STALL als register A nog niet VALID is!)
+            src_core_id = target.registers[reg1]
+            if src_core_id is None: return
+            core_src = master_cpu.cores[src_core_id]
+            if core_src.coreStatus != 'VALID':
+                return  # STALL: Wacht 1 tick totdat L -> A klaar is!
+
+            # 2. HARDWARE HIGH-WATERMARK CHECK
             if len(master_cpu.free_cores) < 15:
-                master_cpu.status = 0          # Signaleer FAIL naar de CPU status
-                target.fsm_state = 'FETCH'     # NIET STALLEN! Ga direct naar de volgende instructie (FAIL)
-                return                         # Breek de CONTEXT-allocatie veilig af
+                master_cpu.status = 0          # Signaleer FAIL naar CPU status
+                target.fsm_state = 'FETCH'     # Niet stallen op high-watermark
+                return
             
-            # 2. Allocatie is gegarandeerd succesvol! Maak nu pas de hardware context aan
-            parent_cpu_id = master_cpu.ID
+            # 3. Allocatie is gegarandeerd succesvol! Maak nu pas de hardware context aan
+            parent_cpu_id = target.ID
             nieuwe_ctx = HardwareContext(master_cpu, reg1, parent_cpu_id=parent_cpu_id)
                 
-            # 3. Configureer de startparameters van de thread
-            nieuwe_ctx.PC = arg2            # Dit wordt het startadres (bijv. 11)
-            nieuwe_ctx.fsm_state = 'FETCH'  # Activeer de thread direct voor de scheduler
-            
-            # 4. Voeg hem toe aan de actieve contexts lijst
+            nieuwe_ctx.PC = arg2
+            nieuwe_ctx.fsm_state = 'FETCH'
             master_cpu.contexts.append(nieuwe_ctx)
             target.fsm_state = 'FETCH'
-            master_cpu.state = 1            # Signaleer succes naar de CPU (27sept26)
+            master_cpu.status = 1
+            # print("Local context started")
 
             # # === NIEUWE DEBUG PRINT REGEL ===
             # ctx_id = len(master_cpu.contexts) - 1
@@ -549,32 +553,58 @@ def _execute_cycleZ32(master_cpu, target):
             # print(f"\033[38;2;0;255;50m[SPAWN] 🚀 Context #{ctx_id:02d} aangemaakt | Matrix pool: {cores_over} cores vrij\033[0m")
             # # =================================
 
+        # elif opcode == Op.RCONTEXT:
+        #     # RCONTEXT arg_reg, task_pc
+        #     # 1. Evalueer de data-waarde van het argument-register op DEZE CPU
+        #     arg_reg = reg1
+        #     arg_val = (
+        #         master_cpu.cores[target.registers[reg1]].value
+        #         if target.registers[reg1] is not None
+        #         else 0
+        #     )
+        #     task_pc = arg2
+
+        #     # 2. CIU stelt het instructie-pakket samen en scant de aangesloten poorten
+        #     ack = master_cpu.ciu.request_remote_context(
+        #         task_pc, arg_reg, arg_val
+        #     )
+
+        #     if ack:
+        #         master_cpu.status = (
+        #             1  # SUCCESS: Taak geaccepteerd door een buur!
+        #         )
+        #     else:
+        #         master_cpu.status = (
+        #             0  # FAIL (NACK): Alle buren vol of niet aangesloten!
+        #         )
+
+        #     # NIET STALLEN! Ga direct door naar de opvang-instructie (FAIL _count)
+        #     target.fsm_state = "FETCH"
         elif opcode == Op.RCONTEXT:
             # RCONTEXT arg_reg, task_pc
-            # 1. Evalueer de data-waarde van het argument-register op DEZE CPU
+            # 1. VALIDEER SOURCE uCORE (STALL als het argumentregister nog niet VALID is!)
+            src_core_id = target.registers[reg1]
+            if src_core_id is None: return
+            core_src = master_cpu.cores[src_core_id]
+            if core_src.coreStatus != 'VALID':
+                return  # STALL: Wacht 1 tick totdat de uCore klaar is!
+
+            # 2. De uCore is VALID: lees de echte berekende waarde uit
             arg_reg = reg1
-            arg_val = (
-                master_cpu.cores[target.registers[reg1]].value
-                if target.registers[reg1] is not None
-                else 0
-            )
+            arg_val = core_src.value
             task_pc = arg2
 
-            # 2. CIU stelt het instructie-pakket samen en scant de aangesloten poorten
+            # 3. CIU stelt het instructie-pakket samen en scant de aangesloten poorten
             ack = master_cpu.ciu.request_remote_context(
                 task_pc, arg_reg, arg_val
             )
 
             if ack:
-                master_cpu.status = (
-                    1  # SUCCESS: Taak geaccepteerd door een buur!
-                )
+                master_cpu.status = 1  # SUCCESS: Taak geaccepteerd door een buur!
             else:
-                master_cpu.status = (
-                    0  # FAIL (NACK): Alle buren vol of niet aangesloten!
-                )
+                master_cpu.status = 0  # FAIL (NACK): Alle buren vol of niet aangesloten!
 
-            # NIET STALLEN! Ga direct door naar de opvang-instructie (FAIL _count)
+            # NIET STALLEN BIJ NACK! Ga direct door naar de opvang-instructie (bijv. JMPF)
             target.fsm_state = "FETCH"
 
         elif opcode == Op.ALLSYNC:

@@ -62,7 +62,7 @@ main:
     OUT A DEV
 
     ; 2. Boot Worker 1 (Link 0) voor Bovenste Helft
-    1 -> A
+    0 -> A
     RBOOT A WORKER_TOP_ENTRY
 
     ; 3. Boot Worker 2 (Link 3) voor Onderste Helft
@@ -144,6 +144,9 @@ WORKER_SPAWN_LOOP:
     L -> A
     RCONTEXT A MANDEL_CALC      ; Upstream taakinjectie naar uCore
     SUCCES spawn_ok
+
+    ; CONTEXT A MANDEL_CALC     ; leidt tot fifo buffer overflow
+    ; SUCCES spawn_ok
 
     JMP CHECK_INCOMING_MSG
 
