@@ -3,12 +3,12 @@
 
 from collections import deque
 import time
-from CIUcontrollerV2 import CIU  # <-- 1. IMPORT CIU CONTROLLER
+from CIUcontrollerV2r1 import CIU  # <-- 1. IMPORT CIU CONTROLLER
 # from memory import Memory
 from memoryMMU import MMU 
 from ucore  import Ucore
 
-from ExecuterZ32AV2 import _execute_cycleZ32 
+from ExecuterZ32AV2r1 import _execute_cycleZ32 
 
 
 # Importeer de STERN-boekhouding uit het andere bestand

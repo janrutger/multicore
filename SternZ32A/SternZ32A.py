@@ -9,7 +9,7 @@ from assemblerV2 import assemble
 from frontpanelZ32G import FrontPanel
 from InmosZ32A import CPU
 from IOcontroller import IOController
-from CIUcontrollerV2 import ChannelLink
+from CIUcontrollerV2r1 import ChannelLink
 from memoryMMU import MMU
 from opcodes import context_stress, display_test, encrypt_program
 
