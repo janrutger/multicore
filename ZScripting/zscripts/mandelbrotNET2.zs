@@ -145,8 +145,8 @@ WORKER_SPAWN_LOOP:
     RCONTEXT A MANDEL_CALC      ; Upstream taakinjectie naar uCore
     SUCCES spawn_ok
 
-    ; CONTEXT A MANDEL_CALC     ; leidt tot fifo buffer overflow
-    ; SUCCES spawn_ok
+    CONTEXT A MANDEL_CALC     ; Kan leiden tot fifo buffer overflow bij teveel Compute power
+    SUCCES spawn_ok
 
     JMP CHECK_INCOMING_MSG
 

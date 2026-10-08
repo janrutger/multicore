@@ -45,20 +45,21 @@ class SternZ32Mainboard:
         ChannelLink(self.cpus[0].ciu, 3, self.cpus[4].ciu, 0)   
 
         ChannelLink(self.cpus[1].ciu, 1, self.cpus[2].ciu, 1)
-        # ChannelLink(self.cpus[1].ciu, 2, self.cpus[3].ciu, 1)
-        # ChannelLink(self.cpus[1].ciu, 3, self.cpus[4].ciu, 1)
+        ChannelLink(self.cpus[1].ciu, 2, self.cpus[3].ciu, 1)
+        ChannelLink(self.cpus[1].ciu, 3, self.cpus[6].ciu, 1)
 
         # ChannelLink(self.cpus[2].ciu, 2, self.cpus[3].ciu, 2)
         # ChannelLink(self.cpus[2].ciu, 3, self.cpus[5].ciu, 2)
 
-        ChannelLink(self.cpus[3].ciu, 3, self.cpus[4].ciu, 1)
+        # ChannelLink(self.cpus[2].ciu, 3, self.cpus[4].ciu, 1)
 
         # Uitbreiding naar 9 [0 .. 8] cpu's
-        ChannelLink(self.cpus[1].ciu, 2, self.cpus[5].ciu, 0)
+        # ChannelLink(self.cpus[1].ciu, 2, self.cpus[5].ciu, 0)
         # ChannelLink(self.cpus[1].ciu, 3, self.cpus[6].ciu, 0)
 
-        ChannelLink(self.cpus[4].ciu, 2, self.cpus[7].ciu, 0)
-        ChannelLink(self.cpus[4].ciu, 3, self.cpus[8].ciu, 0)
+        ChannelLink(self.cpus[4].ciu, 1, self.cpus[7].ciu, 2)
+        ChannelLink(self.cpus[4].ciu, 2, self.cpus[2].ciu, 2)
+        ChannelLink(self.cpus[4].ciu, 3, self.cpus[3].ciu, 2)
         
 
 
@@ -273,13 +274,16 @@ class SternZ32Mainboard:
             cpu_total_time = cpu.time_ucore + cpu.time_gc + cpu.time_context + cpu.time_main
             safe_cpu_tot = cpu_total_time if cpu_total_time > 0 else 0.0001  # Voorkom DivisionByZero
 
+            # Haal de maximale contexten veilig op (met fallback 0)
+            max_ctx = getattr(cpu, 'max_contexts', 0)
+            
             print(
                 f"  s--- EINDSTATUS CPU {cpu.ID} (Vrije Cores:"
                 f" {len(cpu.free_cores)}/32) ---"
             )
             print(
                 f"  FSM State: {cpu.fsm_state:<13} | PC: {cpu.PC:<4} |"
-                f" Actieve Tijd: {cpu_total_time:6.2f} "
+                f" Max CTX: {max_ctx:<2} | Actieve Tijd: {cpu_total_time:6.2f} s"
             )
             print(
                 f"  ├─ uCore Matrix     : {cpu.time_ucore:6.2f} s "
