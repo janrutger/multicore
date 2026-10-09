@@ -32,7 +32,7 @@ class IOController:
         
         # 4. Koppeling met de fysieke Peripherals (zet de boel aan)
         
-        self.text_device      = textDisplay(master_root=self.root)
+        # self.text_device      = textDisplay(master_root=self.root)
         self.graphical_device = GraphicalDisplay(master_root=self.root)
         
         # Initialiseer Toetsenbord-hardware binding op het hoofdvenster
@@ -120,7 +120,7 @@ class IOController:
         De achtergrond-tick op het mainboard.
         Geeft de aangesloten fysieke schermen een klokpuls om hun caches te renderen.
         """
-        self.text_device.tick()
+        # self.text_device.tick()
         self.graphical_device.tick()
 
 
