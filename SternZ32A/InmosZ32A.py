@@ -8,7 +8,7 @@ from CIUcontrollerV2r1 import CIU  # <-- 1. IMPORT CIU CONTROLLER
 from memoryMMU import MMU 
 from ucore  import Ucore
 
-from ExecuterZ32AV2r1 import _execute_cycleZ32 
+from ExecuterZ32AV2r2 import _execute_cycleZ32 
 
 
 # Importeer de STERN-boekhouding uit het andere bestand
@@ -91,55 +91,129 @@ class CPU:
 
 
     
+    # def tick(self):
+    #     """Voert één volledige kloksnelheid-cyclus uit voor het hele systeem."""
+        
+    #     # ==========================================================
+    #     # 1. uCORE MATRIX TICKS (Eén meting voor álle cores samen)
+    #     # ==========================================================
+    #     t0 = time.perf_counter()
+    #     for core_id, core in enumerate(self.cores):
+    #         core.tick()
+
+    #         # --- STAP A: Geef de reeds IDLE cores terug aan de wachtrij ---
+    #         if core.coreStatus == 'IDLE' and core_id not in self.free_cores:
+    #             self.free_cores.append(core_id)
+                
+    #     t1 = time.perf_counter()
+    #     self.time_ucore += (t1 - t0)
+
+    #     # ==========================================================
+    #     # 2. GARBAGE COLLECTION / WEZEN-CHECK (Eén meting voor de hele check)
+    #     # ==========================================================
+    #     t0 = time.perf_counter()
+    #     for core_id, core in enumerate(self.cores):
+    #         if core.coreStatus == 'VALID':
+    #             # 1. Check Master CPU registers
+    #             in_master_register = any(reg_id == core_id for reg_id in self.registers.values())
+                
+    #             # 2. Check ALLE threads die nog in het systeem zitten (ongeacht FSM status!)
+    #             in_thread_register = False
+    #             for ctx in self.contexts:
+    #                 if any(reg_id == core_id for reg_id in ctx.registers.values()):
+    #                     in_thread_register = True
+    #                     break
+                        
+    #             is_test_core = (self.last_test_core == core_id)
+                
+    #             # 3. Check of er een WORKING core is die deze core nodig heeft
+    #             wordt_nog_bezocht = False
+    #             for andere_core in self.cores:
+    #                 if andere_core.coreStatus == 'WORKING':
+    #                     if andere_core.arg1 == core_id or andere_core.arg2 == core_id:
+    #                         wordt_nog_bezocht = True
+    #                         break
+                
+    #             # Alleen slopen als hij énkel door helemaal niemand meer geclaimd wordt
+    #             if not in_master_register and not in_thread_register and not is_test_core and not wordt_nog_bezocht:
+    #                 core.coreStatus = 'IDLE'
+                    
+    #     t1 = time.perf_counter()
+    #     self.time_gc += (t1 - t0)
     def tick(self):
         """Voert één volledige kloksnelheid-cyclus uit voor het hele systeem."""
         
+        # Lokale referenties voor snelheid (vermijdt 'self.' lookup in loops)
+        current_cores = self.cores
+        current_free_cores = self.free_cores
+
         # ==========================================================
-        # 1. uCORE MATRIX TICKS (Eén meting voor álle cores samen)
+        # 1. uCORE MATRIX TICKS
         # ==========================================================
         t0 = time.perf_counter()
-        for core_id, core in enumerate(self.cores):
+        
+        # Gebruik bereik in plaats van enumerate als we core_id niet direct nodig hebben
+        # of als we lokale refs gebruiken.
+        for core in current_cores:
             core.tick()
-
-            # --- STAP A: Geef de reeds IDLE cores terug aan de wachtrij ---
-            if core.coreStatus == 'IDLE' and core_id not in self.free_cores:
-                self.free_cores.append(core_id)
                 
-        t1 = time.perf_counter()
-        self.time_ucore += (t1 - t0)
+        self.time_ucore += (time.perf_counter() - t0)
 
         # ==========================================================
-        # 2. GARBAGE COLLECTION / WEZEN-CHECK (Eén meting voor de hele check)
+        # 2. GARBAGE COLLECTION / WEZEN-CHECK (Geoptimaliseerd)
         # ==========================================================
         t0 = time.perf_counter()
-        for core_id, core in enumerate(self.cores):
-            if core.coreStatus == 'VALID':
-                # 1. Check Master CPU registers
-                in_master_register = any(reg_id == core_id for reg_id in self.registers.values())
-                
-                # 2. Check ALLE threads die nog in het systeem zitten (ongeacht FSM status!)
-                in_thread_register = False
-                for ctx in self.contexts:
-                    if any(reg_id == core_id for reg_id in ctx.registers.values()):
-                        in_thread_register = True
-                        break
-                        
-                is_test_core = (self.last_test_core == core_id)
-                
-                # 3. Check of er een WORKING core is die deze core nodig heeft
-                wordt_nog_bezocht = False
-                for andere_core in self.cores:
-                    if andere_core.coreStatus == 'WORKING':
-                        if andere_core.arg1 == core_id or andere_core.arg2 == core_id:
-                            wordt_nog_bezocht = True
-                            break
-                
-                # Alleen slopen als hij énkel door helemaal niemand meer geclaimd wordt
-                if not in_master_register and not in_thread_register and not is_test_core and not wordt_nog_bezocht:
+        
+        # --- PRE-BEREKENING: Bouw een set van álle actieve referenties ---
+        # Lookups in een set zijn O(1). Dit is de sleutel tot de versnelling.
+        claimed_cores = set()
+        
+        # 1. Verzamel Master CPU registers
+        for reg_id in self.registers.values():
+            if reg_id is not None:
+                claimed_cores.add(reg_id)
+        
+        # 2. Verzamel referenties uit ALLE actieve threads
+        for ctx in self.contexts:
+            # Platgeslagen loop is vaak sneller dan set(ctx.registers.values()) onder PyPy
+            for reg_id in ctx.registers.values():
+                if reg_id is not None:
+                    claimed_cores.add(reg_id)
+        
+        # 3. Voeg de speciale test_core toe
+        if self.last_test_core is not None:
+            claimed_cores.add(self.last_test_core)
+            
+        # 4. Verzamel dependencies van WORKING cores
+        for core in current_cores:
+            if core.coreStatus == 'WORKING':
+                if core.arg1 is not None:
+                    claimed_cores.add(core.arg1)
+                if core.arg2 is not None:
+                    claimed_cores.add(core.arg2)
+
+        # --- HOOFD GC LOOP: Scann de cores ---
+        for core_id, core in enumerate(current_cores):
+            status = core.coreStatus
+            
+            # --- Geïntegreerde Stap A: IDLE cores teruggeven ---
+            if status == 'IDLE':
+                # Gebruikmakend van het feit dat free_cores nu waarschijnlijk een set of 
+                # efficiënte queue is. Als het een set is, is 'in' O(1).
+                if core_id not in current_free_cores:
+                    current_free_cores.append(core_id)
+                continue # Direct door naar de volgende core
+
+            # --- Stap B: Wezen-check voor VALID cores ---
+            if status == 'VALID':
+                # O(1) lookup in de pre-berekende set
+                if core_id not in claimed_cores:
                     core.coreStatus = 'IDLE'
+                    # Optioneel: direct toevoegen aan free_cores, 
+                    # maar dat gebeurt de volgende tick via Stap A ook.
+                    # current_free_cores.append(core_id)
                     
-        t1 = time.perf_counter()
-        self.time_gc += (t1 - t0)
+        self.time_gc += (time.perf_counter() - t0)
 
         # ==========================================================
         # 3. CONTEXT SCHEDULER (RCONTEXT THREADS)
