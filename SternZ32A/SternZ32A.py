@@ -9,7 +9,7 @@ from assemblerV2 import assemble
 from frontpanelZ32G import FrontPanel
 from InmosZ32A import CPU
 from IOcontroller import IOController
-from CIUcontrollerV2r1 import ChannelLink
+from CIUcontrollerV2r2 import ChannelLink
 from memoryMMU import MMU
 from opcodes import context_stress, display_test, encrypt_program
 
@@ -44,8 +44,8 @@ class SternZ32Mainboard:
         ChannelLink(self.cpus[0].ciu, 2, self.cpus[3].ciu, 0) 
         ChannelLink(self.cpus[0].ciu, 3, self.cpus[4].ciu, 0)   
 
-        ChannelLink(self.cpus[1].ciu, 1, self.cpus[2].ciu, 1)
-        ChannelLink(self.cpus[1].ciu, 2, self.cpus[3].ciu, 1)
+        ChannelLink(self.cpus[1].ciu, 1, self.cpus[5].ciu, 1)
+        ChannelLink(self.cpus[1].ciu, 2, self.cpus[8].ciu, 1)
         ChannelLink(self.cpus[1].ciu, 3, self.cpus[6].ciu, 1)
 
         # ChannelLink(self.cpus[2].ciu, 2, self.cpus[3].ciu, 2)

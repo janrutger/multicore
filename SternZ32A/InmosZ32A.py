@@ -3,7 +3,7 @@
 
 from collections import deque
 import time
-from CIUcontrollerV2r1 import CIU  # <-- 1. IMPORT CIU CONTROLLER
+from CIUcontrollerV2r2 import CIU  # <-- 1. IMPORT CIU CONTROLLER
 # from memory import Memory
 from memoryMMU import MMU 
 from ucore  import Ucore
@@ -218,14 +218,19 @@ class CPU:
         # ==========================================================
         # 3. CONTEXT SCHEDULER (RCONTEXT THREADS)
         # ==========================================================
-        t0 = time.perf_counter()
+        # t0 = time.perf_counter()
         active_running_contexts = [c for c in self.contexts if c.fsm_state in ('FETCH', 'DECODE', 'EXECUTE', 'RUNNING')]
 
-        # --- HIER BIJHOUDEN VAN DE CONCURRENTIE-PIEK ---
-        if len(active_running_contexts) > self.max_contexts:
-            self.max_contexts = len(active_running_contexts)
+        # # --- HIER BIJHOUDEN VAN DE CONCURRENTIE-PIEK ---
+        # if len(active_running_contexts) > self.max_contexts:
+        #     self.max_contexts = len(active_running_contexts)
         
         if active_running_contexts:
+            t0 = time.perf_counter()
+            # --- HIER BIJHOUDEN VAN DE CONCURRENTIE-PIEK ---
+            if len(active_running_contexts) > self.max_contexts:
+                self.max_contexts = len(active_running_contexts)
+
             if self.current_context_index >= len(active_running_contexts):
                 self.current_context_index = 0
                 
@@ -239,8 +244,9 @@ class CPU:
         
             self.current_context_index = (self.current_context_index + 1) % len(active_running_contexts)
             
-        t1 = time.perf_counter()
-        self.time_context += (t1 - t0)
+        # t1 = time.perf_counter()
+        # self.time_context += (t1 - t0)
+            self.time_context += (time.perf_counter() - t0)
 
         # ==========================================================
         # 4. HOOFD-CPU PIPELINE

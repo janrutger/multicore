@@ -494,15 +494,44 @@ def _h_iosync(master_cpu, target, reg1, arg2):
     target.fsm_state = 'FETCH'
 
 # --- CIU MAILBOX HANDLERS ---
+# def _h_msg_start(master_cpu, target, reg1, arg2):
+#     rx_core_id = target.registers[reg1]
+#     ry_core_id = target.registers[arg2]
+#     if rx_core_id is None or ry_core_id is None:
+#         target.fsm_state = 'EXECUTE'
+#         return
+        
+#     core_rx = master_cpu.cores[rx_core_id]
+#     core_ry = master_cpu.cores[ry_core_id]
+#     if core_rx.coreStatus != 'VALID' or core_ry.coreStatus != 'VALID':
+#         target.fsm_state = 'EXECUTE'
+#         return
+        
+#     if not master_cpu.free_cores:
+#         target.fsm_state = 'EXECUTE'
+#         return
+
+#     parent_id = getattr(target, 'parent_cpu_id', getattr(target, 'parent_id', getattr(master_cpu, 'parent_id', 0)))
+#     success, tx_id = master_cpu.ciu.msg_start(core_rx.value, core_ry.value, parent_id)
+#     target.status = 1 if success else 0
+
+#     if success:
+#         core_id = master_cpu.free_cores.popleft()
+#         master_cpu.cores[core_id].transfer = tx_id
+#         master_cpu.cores[core_id].dispatch('ldv')
+#         target.registers[arg2] = core_id
+#     target.fsm_state = 'FETCH'
 def _h_msg_start(master_cpu, target, reg1, arg2):
     rx_core_id = target.registers[reg1]
     ry_core_id = target.registers[arg2]
+    
     if rx_core_id is None or ry_core_id is None:
         target.fsm_state = 'EXECUTE'
         return
         
     core_rx = master_cpu.cores[rx_core_id]
     core_ry = master_cpu.cores[ry_core_id]
+    
     if core_rx.coreStatus != 'VALID' or core_ry.coreStatus != 'VALID':
         target.fsm_state = 'EXECUTE'
         return
@@ -512,14 +541,21 @@ def _h_msg_start(master_cpu, target, reg1, arg2):
         return
 
     parent_id = getattr(target, 'parent_cpu_id', getattr(target, 'parent_id', getattr(master_cpu, 'parent_id', 0)))
+    
+    # Probeer bericht te starten via de CIU
     success, tx_id = master_cpu.ciu.msg_start(core_rx.value, core_ry.value, parent_id)
-    target.status = 1 if success else 0
+    
+    # --- NIEUW: STALL BIJ FULL FIFO (FLOW CONTROL) ---
+    if not success:
+        target.fsm_state = 'EXECUTE'  # Buurman FIFO is vol: Blijf in EXECUTE en probeer volgende tick opnieuw!
+        return
 
-    if success:
-        core_id = master_cpu.free_cores.popleft()
-        master_cpu.cores[core_id].transfer = tx_id
-        master_cpu.cores[core_id].dispatch('ldv')
-        target.registers[arg2] = core_id
+    target.status = 1
+
+    core_id = master_cpu.free_cores.popleft()
+    master_cpu.cores[core_id].transfer = tx_id
+    master_cpu.cores[core_id].dispatch('ldv')
+    target.registers[arg2] = core_id
     target.fsm_state = 'FETCH'
 
 def _h_msg_write(master_cpu, target, reg1, arg2):

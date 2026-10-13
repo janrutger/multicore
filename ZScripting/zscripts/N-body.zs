@@ -7,14 +7,14 @@ MAP {
     START main
 
     ; === GEHEUGEN ALLOCATIE (UNIVERSUM STATE) ===
-    CONST NUM_BODIES 64        ; Totaal 24 hemellichamen
-    SHARED body_x 64           ; Actuele X-posities
-    SHARED body_y 64           ; Actuele Y-posities
-    SHARED body_vx 64          ; Snelheid X
-    SHARED body_vy 64          ; Snelheid Y
+    CONST NUM_BODIES 16        ; Totaal 24 hemellichamen
+    SHARED body_x 16           ; Actuele X-posities
+    SHARED body_y 16           ; Actuele Y-posities
+    SHARED body_vx 16          ; Snelheid X
+    SHARED body_vy 16          ; Snelheid Y
 
     ; Synchronisatie en slot-status voor de lichamen
-    SHARED body_status 64      ; 0 = Vrij/Klaar, 1 = Bezig met berekenen (Worker lock)
+    SHARED body_status 16      ; 0 = Vrij/Klaar, 1 = Bezig met berekenen (Worker lock)
     SHARED step_counter 1      ; Huidige simulatieronde
 
     CONST MAX_STEPS 600        ; Aantal simulatieframes
@@ -126,7 +126,7 @@ main:
 SIMULATION_TICK:
     0 -> I
     TICK_LOOP:
-        startTask(BODY_SIMULATE, I)
+        startTask(BODY_SIMULATE_new, I)
 
         INC I
         NUM_BODIES -> B
@@ -223,72 +223,95 @@ BODY_SIMULATE:
 ; Input: Register I bevat het Lichaam ID (0 t/m NUM_BODIES-1)
 ; ==========================================================
 BODY_SIMULATE_new:
-    ; 1. Parkeer het eigen Lichaam ID veilig (omdat I gebruikt wordt voor LDX/STX)
-    0 -> Y
-    I -> Y                  ; Y = mijn eigen Lichaam ID backup
+    ; 1. Bewaar het eigen ID in register M
+    0 -> M
+    I -> M                  ; M = mijn eigen Lichaam ID backup
 
-    0 -> B                  ; Delta VX accumulator
-    0 -> C                  ; Delta VY accumulator
+    0 -> A 
+    0 -> B 
+    0 -> C 
+
+    0 -> X                  ; Accumulator Delta VX = 0
+    0 -> Y                  ; Accumulator Delta VY = 0
     0 -> L                  ; Inner-loop teller L = 0
-    0 -> M 
-    NUM_BODIES -> X         ; Totaal aantal lichamen
-    0 -> Z 
 
-    ; Lees eigen positie van lichaam I uit Shared RAM (gebruikt huidige I)
+    ; Lees eigen positie uit Shared RAM
     LDX A, body_x           ; A = mijn X
     LDX K, body_y           ; K = mijn Y
 
-    ; Bewaar eigen posities tijdelijk in registers om conflicten te vermijden
-    A -> M                  ; M = mijn X-backup
-    K -> Z                  ; Z = mijn Y-backup
+    ; Bewaar eigen posities tijdelijk in registers
+    A -> B                  ; B = mijn X-backup
+    K -> C                  ; C = mijn Y-backup
 
-    ; --- 2. DE GENESTE INTERACTIE-LUS (L van 0 tot NUM_BODIES) ---
+    NUM_BODIES -> Z         ; Z = Totaal aantal lichamen
+
+; --- 2. DE GENESTE INTERACTIE-LUS ---
 N_BODY_LOOP:
-    ; Check of L gelijk is aan ons eigen ID (geen zelf-aantrekking)
-    TSTE L Y                ; Vergelijk lus-teller L met onze opgeslagen ID in Y
-    JMPT _skip_self         ; Als L == Y, sla deze iteratie over
+    ; Check of L gelijk is aan ons eigen ID (M)
+    TSTE L M
+    JMPT _skip_self
 
-    ; Lees positie van het andere lichaam L via de compiler-ondersteunde indexering
+    ; Lees positie van het andere lichaam L
     [body_x + L] -> A       ; A = X van lichaam L
     [body_y + L] -> K       ; K = Y van lichaam L
 
     ; Bereken afstandsdeltas: dx = body_x[L] - body_x[I]
-    SUB A, M                ; A = X_l - X_i (dx)
-    SUB K, Z                ; K = Y_l - Y_i (dy)
+    SUB A, B                ; A = dx (X_l - X_i)
+    SUB K, C                ; K = dy (Y_l - Y_i)
 
-    ; Accumuleer de krachten (eenvoudige lineaire krachtsopbouw als start)
-    ADD B, A                ; Accumuleer dx in B
-    ADD C, K                ; Accumuleer C in K
+    ; Schaal de zwaartekracht flink af (delen door 32) om rustige banen te krijgen
+    DIVI A, 32
+    DIVI K, 32
+
+    ; Accumuleer deltas in X en Y
+    ADD X, A                ; X = X + dx
+    ADD Y, K                ; Y = Y + dy
 
 _skip_self:
-    INC L                   ; Verhoog inner-loop teller L
-    TSTE L X                ; Is L gelijk aan NUM_BODIES?
-    JMPF N_BODY_LOOP        ; Zo niet, spring terug naar het begin van de lus
+    INC L                   ; Volgende lichaam
+    TSTE L Z                ; Is L == NUM_BODIES?
+    JMPF N_BODY_LOOP        ; Zo niet, herhaal
 
-    ; --- 3. HERSTEL EIGEN ID EN PAS SNELHEID/POSITIE TOE ---
-    Y -> I                  ; Herstel het originele Lichaam ID in I voor de LDX/STX commando's
+    ; --- 3. HERSTEL EIGEN ID EN PAS SNELHEID TOE ---
+    M -> I                  ; Herstel origineel ID in I
 
-    ; Lees huidige snelheid van lichaam I
+    ; Lees huidige snelheid
     LDX A, body_vx          ; A = VX
     LDX K, body_vy          ; K = VY
 
-    ; Tel de opgebouwde gravitatie-invloeden op bij de snelheid
-    ADD A, B                ; Nieuwe VX = VX + Delta_VX
-    ADD K, C                ; Nieuwe VY = VY + Delta_VY
+    ; DEMPING (Wrijving tegen oneindig doorschieten)
+    SHIFTR A, 1             ; VX = VX / 2
+    SHIFTR K, 1             ; VY = VY / 2
 
-    ; Sla de nieuwe snelheid op in Shared RAM
+    ; Tel de geaccumuleerde N-body krachten op
+    ADD A, X                ; VX += Delta_VX
+    ADD K, Y                ; VY += Delta_VY
+
+    ; === EXTRA: Lichte trekkracht naar het schermmidden (CENTER_X / CENTER_Y) ===
+    LDX B, body_x           ; B = Huidige X
+    CENTER_X -> Z
+    SUB Z, B                ; Z = CENTER_X - X
+    DIVI Z, 64              ; Zachte trekkracht
+    ADD A, Z                ; Tel toe aan VX
+
+    LDX C, body_y           ; C = Huidige Y
+    CENTER_Y -> Z
+    SUB Z, C                ; Z = CENTER_Y - Y
+    DIVI Z, 64              ; Zachte trekkracht
+    ADD K, Z                ; Tel toe aan VY
+    ; =========================================================================
+
+    ; Sla de nieuwe snelheden op
     STX A, body_vx
     STX K, body_vy
 
-    ; 4. Pas snelheid toe op de actuele positie
-    LDX A, body_x           ; Haal huidige X op
-    LDX C, body_y           ; Haal huidige Y op
-    ADD A, B                ; X = X + VX
-    ADD C, K                ; Y = Y + VY
+    ; --- 4. PAS SNELHEID TOE OP POSITIE ---
+    ADD B, A                ; Nieuwe X = X + VX
+    ADD C, K                ; Nieuwe Y = Y + VY
 
-    ; Sla de nieuwe posities op in Shared RAM
-    STX A, body_x
+    STX B, body_x
     STX C, body_y
 
     AUTOCLOSE
+
 }
