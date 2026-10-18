@@ -89,7 +89,7 @@ class GraphicalDisplay:
                     color = self.palette[color_idx]
                     
                     # Teken een 1x1 pixel (of groter blok op basis van je pixel-schaal)
-                    self.canvas.create_rectangle(x, y, x+0, y+0, outline=color, fill=color)
+                    self.canvas.create_rectangle(x, y, x+1, y+1, outline=color, fill=color)
 
 # class GraphicalDisplay:
 #     def __init__(self, master_root):

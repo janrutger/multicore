@@ -8,14 +8,14 @@ MAP {
 
     ; === GEHEUGEN ALLOCATIE (UNIVERSUM STATE) ===
     CONST NUM_BODIES 24        ; 24 hemellichamen
-    SHARED body_x 24           ; Actuele X-posities (Q1000 Fixed-Point)
-    SHARED body_y 24           ; Actuele Y-posities (Q1000 Fixed-Point)
-    SHARED body_vx 24          ; Snelheid X (Q1000 Fixed-Point)
-    SHARED body_vy 24          ; Snelheid Y (Q1000 Fixed-Point)
-    SHARED body_m 24           ; NIEUW: Massa per lichaam (Fixed-Point schaal)
+    SHARED body_x 64           ; Actuele X-posities (Q1000 Fixed-Point)
+    SHARED body_y 64           ; Actuele Y-posities (Q1000 Fixed-Point)
+    SHARED body_vx 64          ; Snelheid X (Q1000 Fixed-Point)
+    SHARED body_vy 64          ; Snelheid Y (Q1000 Fixed-Point)
+    SHARED body_m 64           ; NIEUW: Massa per lichaam (Fixed-Point schaal)
 
     SHARED step_counter 1      ; Simulatieframes
-    CONST MAX_STEPS 750        ; Aantal simulatieframes
+    CONST MAX_STEPS 1000        ; Aantal simulatieframes
 
     ; Schermmidden (Q1000 Fixed-Point: 320 * 1000 = 320000)
     CONST CENTER_X 320000

@@ -9,9 +9,12 @@ from assemblerV2 import assemble
 from frontpanelZ32G import FrontPanel
 from InmosZ32A import CPU
 from IOcontroller import IOController
-from CIUcontrollerV2r2 import ChannelLink
+
 from memoryMMU import MMU
 from opcodes import context_stress, display_test, encrypt_program
+
+#from CIUcontrollerV2r2 import ChannelLink
+from CIUbusV2r1 import CIUBus
 
 
 class SternZ32Mainboard:
@@ -33,33 +36,36 @@ class SternZ32Mainboard:
         # 2. Initialiseer de Centrale MMU (Andrew S. geheugenbus)
         self.mmu = MMU(Page0=1024, Private=512, Shared=1024, block_size=64)
 
-        # 3. Dynamische CPU Matrix aanmaken
+        # 3. Dynamische CPU bus aanmaken
+        ciu_bus = CIUBus()
         self.cpus = [
             CPU(cpu_id=i, memory=self.mmu) for i in range(self.num_cpus)
         ]
+        for cpu in self.cpus:
+            cpu.ciu.attach_bus(ciu_bus)
 
-        # 2. Trek direct een ChannelLink tussen CPU0 (poort 0) en CPU1 (poort 0)
-        ChannelLink(self.cpus[0].ciu, 0, self.cpus[1].ciu, 0) 
-        ChannelLink(self.cpus[0].ciu, 1, self.cpus[2].ciu, 0)
-        ChannelLink(self.cpus[0].ciu, 2, self.cpus[3].ciu, 0) 
-        ChannelLink(self.cpus[0].ciu, 3, self.cpus[4].ciu, 0)   
+        # # 2. Trek direct een ChannelLink tussen CPU0 (poort 0) en CPU1 (poort 0)
+        # ChannelLink(self.cpus[0].ciu, 0, self.cpus[1].ciu, 0) 
+        # ChannelLink(self.cpus[0].ciu, 1, self.cpus[2].ciu, 0)
+        # ChannelLink(self.cpus[0].ciu, 2, self.cpus[3].ciu, 0) 
+        # ChannelLink(self.cpus[0].ciu, 3, self.cpus[4].ciu, 0)   
 
-        ChannelLink(self.cpus[1].ciu, 1, self.cpus[5].ciu, 1)
-        ChannelLink(self.cpus[1].ciu, 2, self.cpus[8].ciu, 1)
-        ChannelLink(self.cpus[1].ciu, 3, self.cpus[6].ciu, 1)
+        # ChannelLink(self.cpus[1].ciu, 1, self.cpus[5].ciu, 1)
+        # ChannelLink(self.cpus[1].ciu, 2, self.cpus[8].ciu, 1)
+        # ChannelLink(self.cpus[1].ciu, 3, self.cpus[6].ciu, 1)
 
-        # ChannelLink(self.cpus[2].ciu, 2, self.cpus[3].ciu, 2)
-        # ChannelLink(self.cpus[2].ciu, 3, self.cpus[5].ciu, 2)
+        # # ChannelLink(self.cpus[2].ciu, 2, self.cpus[3].ciu, 2)
+        # # ChannelLink(self.cpus[2].ciu, 3, self.cpus[5].ciu, 2)
 
-        # ChannelLink(self.cpus[2].ciu, 3, self.cpus[4].ciu, 1)
+        # # ChannelLink(self.cpus[2].ciu, 3, self.cpus[4].ciu, 1)
 
-        # Uitbreiding naar 9 [0 .. 8] cpu's
-        # ChannelLink(self.cpus[1].ciu, 2, self.cpus[5].ciu, 0)
-        # ChannelLink(self.cpus[1].ciu, 3, self.cpus[6].ciu, 0)
+        # # Uitbreiding naar 9 [0 .. 8] cpu's
+        # # ChannelLink(self.cpus[1].ciu, 2, self.cpus[5].ciu, 0)
+        # # ChannelLink(self.cpus[1].ciu, 3, self.cpus[6].ciu, 0)
 
-        ChannelLink(self.cpus[4].ciu, 1, self.cpus[7].ciu, 2)
-        ChannelLink(self.cpus[4].ciu, 2, self.cpus[2].ciu, 2)
-        ChannelLink(self.cpus[4].ciu, 3, self.cpus[3].ciu, 2)
+        # ChannelLink(self.cpus[4].ciu, 1, self.cpus[7].ciu, 2)
+        # ChannelLink(self.cpus[4].ciu, 2, self.cpus[2].ciu, 2)
+        # ChannelLink(self.cpus[4].ciu, 3, self.cpus[3].ciu, 2)
         
 
 
@@ -67,54 +73,54 @@ class SternZ32Mainboard:
         # =========================================================================
         # --- DEBUG ROUTINE: TOON CIU TOPOLOGIE EN AFBREKEN ---
         # =========================================================================
-        import sys
+        # import sys
 
-        print("\n==========================================================")
-        print("           CIU TOPOLOGIE VERBINDINGEN DIAGNOSTIEK          ")
-        print("==========================================================")
+        # print("\n==========================================================")
+        # print("           CIU TOPOLOGIE VERBINDINGEN DIAGNOSTIEK          ")
+        # print("==========================================================")
 
-        for cpu in self.cpus:
-            print(f"CPU {cpu.ID} (CIU Matrix):")
-            actieve_links = 0
+        # for cpu in self.cpus:
+        #     print(f"CPU {cpu.ID} (CIU Matrix):")
+        #     actieve_links = 0
 
-            for port_id, link in enumerate(cpu.ciu.links):
-                if link is not None:
-                    neighbor_ciu = link.get_other_end(cpu.ciu)
+        #     for port_id, link in enumerate(cpu.ciu.links):
+        #         if link is not None:
+        #             neighbor_ciu = link.get_other_end(cpu.ciu)
 
-                    if neighbor_ciu is not None:
-                        # Bepaal ook op welke poort de kabel bij de buur-CPU zit
-                        neighbor_port = None
-                        if (
-                            link.endpoint_a
-                            and link.endpoint_a[0] == neighbor_ciu
-                        ):
-                            neighbor_port = link.endpoint_a[1]
-                        elif (
-                            link.endpoint_b
-                            and link.endpoint_b[0] == neighbor_ciu
-                        ):
-                            neighbor_port = link.endpoint_b[1]
+        #             if neighbor_ciu is not None:
+        #                 # Bepaal ook op welke poort de kabel bij de buur-CPU zit
+        #                 neighbor_port = None
+        #                 if (
+        #                     link.endpoint_a
+        #                     and link.endpoint_a[0] == neighbor_ciu
+        #                 ):
+        #                     neighbor_port = link.endpoint_a[1]
+        #                 elif (
+        #                     link.endpoint_b
+        #                     and link.endpoint_b[0] == neighbor_ciu
+        #                 ):
+        #                     neighbor_port = link.endpoint_b[1]
 
-                        print(
-                            f"  [Poort {port_id}] ===> VERBONDEN MET ===> CPU"
-                            f" {neighbor_ciu.cpu.ID} (Poort {neighbor_port})"
-                        )
-                        actieve_links += 1
-                    else:
-                        print(
-                            f"  [Poort {port_id}] ===> Kabel aangesloten, maar"
-                            " Geen Buur!"
-                        )
-                else:
-                    print(f"  [Poort {port_id}] --- Niet aangesloten ---")
+        #                 print(
+        #                     f"  [Poort {port_id}] ===> VERBONDEN MET ===> CPU"
+        #                     f" {neighbor_ciu.cpu.ID} (Poort {neighbor_port})"
+        #                 )
+        #                 actieve_links += 1
+        #             else:
+        #                 print(
+        #                     f"  [Poort {port_id}] ===> Kabel aangesloten, maar"
+        #                     " Geen Buur!"
+        #                 )
+        #         else:
+        #             print(f"  [Poort {port_id}] --- Niet aangesloten ---")
 
-            if actieve_links == 0:
-                print("  (WAARSCHUWING: Deze CPU heeft NUL actieve verbindingen!)")
-            print("----------------------------------------------------------")
+        #     if actieve_links == 0:
+        #         print("  (WAARSCHUWING: Deze CPU heeft NUL actieve verbindingen!)")
+        #     print("----------------------------------------------------------")
 
-        print("==========================================================")
-        print(" DIAGNOSTIEK VOLTOOID -                                   ")
-        print("==========================================================\n")
+        # print("==========================================================")
+        # print(" DIAGNOSTIEK VOLTOOID -                                   ")
+        # print("==========================================================\n")
 
         # sys.exit(0)  # Breek de uitvoering direct af
 

@@ -62,11 +62,11 @@ main:
     OUT A DEV
 
     ; 2. Boot Worker 1 (Link 0) voor Bovenste Helft
-    0 -> A
+    1 -> A
     RBOOT A WORKER_TOP_ENTRY
 
     ; 3. Boot Worker 2 (Link 3) voor Onderste Helft
-    3 -> A
+    4 -> A
     RBOOT A WORKER_BOTTOM_ENTRY
 
 ; --- MASTER LISTEN LOOP ---

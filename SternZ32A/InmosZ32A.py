@@ -3,7 +3,8 @@
 
 from collections import deque
 import time
-from CIUcontrollerV2r2 import CIU  # <-- 1. IMPORT CIU CONTROLLER
+# from CIUcontrollerV2r2 import CIU  # <-- 1. IMPORT CIU CONTROLLER
+from CIUbusV2r1 import CIU
 # from memory import Memory
 from memoryMMU import MMU 
 from ucore  import Ucore

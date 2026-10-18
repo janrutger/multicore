@@ -14,7 +14,7 @@ MAP {
     SHARED body_vy 24          ; Snelheid Y (Q1000 Fixed-Point)
 
     SHARED step_counter 1      ; Simulatieframes
-    CONST MAX_STEPS 1000       ; Aantal simulatieframes
+    CONST MAX_STEPS 500       ; Aantal simulatieframes
 
     ; Schermmidden (Q1000 Fixed-Point: 320 * 1000 = 320000)
     CONST CENTER_X 320000
