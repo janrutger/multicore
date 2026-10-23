@@ -128,7 +128,7 @@ class SternZ32Mainboard:
         self.show_log = False
 
         # 4. Soldeer de IOController op het mainboard en koppel aan Master CPU 0
-        self.io_controller = IOController(self.root)
+        self.io_controller = IOController(self.root, tekst=False, kbd=False, xyplot=True)
         self.cpus[0].IO(self.io_controller)
 
         # 5. Koppel het Frontpanel (toont Edsgar-cores van Master CPU 0)
@@ -284,7 +284,7 @@ class SternZ32Mainboard:
             max_ctx = getattr(cpu, 'max_contexts', 0)
             
             print(
-                f"  s--- EINDSTATUS CPU {cpu.ID} (Vrije Cores:"
+                f"  --- EINDSTATUS CPU {cpu.ID} (Vrije Cores:"
                 f" {len(cpu.free_cores)}/32) ---"
             )
             print(

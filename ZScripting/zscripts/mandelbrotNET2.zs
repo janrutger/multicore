@@ -66,7 +66,7 @@ main:
     RBOOT A WORKER_TOP_ENTRY
 
     ; 3. Boot Worker 2 (Link 3) voor Onderste Helft
-    4 -> A
+    2 -> A
     RBOOT A WORKER_BOTTOM_ENTRY
 
 ; --- MASTER LISTEN LOOP ---

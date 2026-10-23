@@ -5,12 +5,15 @@ from tekstdisplay  import textDisplay
 from graphDisplay  import GraphicalDisplay
 
 class IOController:
-    def __init__(self, master_root):
+    def __init__(self, master_root, tekst=False, kbd=False, xyplot=False):
         """
         De hardware IO-Controller chip voor het SternZ32 platform.
         Beheert de registers reg0 t/m reg6 en wikkelt communicatie asynchroon af.
         """
         self.root = master_root
+        self.tekst = tekst
+        self.kbd   = kbd
+        self.xyplot = xyplot
         
         # 1. Interne Hardware Registers van de IO-Controller
         self.registers = {
@@ -32,11 +35,14 @@ class IOController:
         
         # 4. Koppeling met de fysieke Peripherals (zet de boel aan)
         
-        self.text_device      = textDisplay(master_root=self.root)
-        self.graphical_device = GraphicalDisplay(master_root=self.root)
+        if self.tekst:
+            self.text_device      = textDisplay(master_root=self.root)
+        if self.xyplot:   
+            self.graphical_device = GraphicalDisplay(master_root=self.root)
         
         # Initialiseer Toetsenbord-hardware binding op het hoofdvenster
-        self.root.bind("<Key>", self.hardware_keyboard_callback)
+        if self.kbd:
+            self.root.bind("<Key>", self.hardware_keyboard_callback)
         
 
     def hardware_keyboard_callback(self, event):
@@ -120,8 +126,10 @@ class IOController:
         De achtergrond-tick op het mainboard.
         Geeft de aangesloten fysieke schermen een klokpuls om hun caches te renderen.
         """
-        self.text_device.tick()
-        self.graphical_device.tick()
+        if self.tekst:
+            self.text_device.tick()
+        if self.xyplot:
+            self.graphical_device.tick()
 
 
 
@@ -140,7 +148,7 @@ if __name__ == "__main__":
     root.withdraw() 
     
     print("[POST] STEP 1: Initialiseren IO-Controller & Peripherals...")
-    ioc = IOController(root)
+    ioc = IOController(root, tekst=True, kbd=True, xyplot=True)
     print("[ OK ] Hardware componenten opgestart.")
     
     # --- TEST 1: Register Lezen/Schrijven ---

@@ -151,7 +151,7 @@ SIMULATION_TICK:
 
     ; --- FRAME THROTTLING VIA MODULO 3 OP STEP_COUNTER ---
     [step_counter] -> A
-    1 -> B
+    3 -> B
     MOD A, B               ; A = step_counter % 3
     TSTZ A                 ; Restwaarde 0?
     JMPF SKIP_DRAWING      ; Zo nee, sla renderen over!
