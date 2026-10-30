@@ -8,7 +8,7 @@ MAP {
 
     ; === CONSTANTEN & CONFIGURATIE ===
     CONST NUM_BODIES 12          ; 2 zware sterren + 6 or more vrije elementen
-    CONST MAX_STEPS 1750        ; Aantal simulatieframes
+    CONST MAX_STEPS 2000        ; Aantal simulatieframes
     CONST CENTER_X 320000       ; Schermmidden X (320 * 1000 Q1000)
     CONST CENTER_Y 240000       ; Schermmidden Y (240 * 1000 Q1000)
     CONST FP_SCALE 1000         ; Q1000 Fixed-Point schaal
@@ -110,48 +110,49 @@ main:
             A -> [body_m + I]
         }
 
-        ; --- VRIJE ELEMENTEN (Lichamen 2 t/m 7) ---
+        ; --- VRIJE ELEMENTEN (Lichamen 2 t/m 11) ---
         IF (I ZERO) FALSE {
             IF (I == C) FALSE {
+                ; 1. Symmetrische X-verdeling rond CENTER_X (-60.000 tot +60.000)
                 I -> A
                 5 -> C
-                MOD A, C        ; A = I % 5
+                MOD A, C            ; A = I % 5 (0..4)
                 30000 -> C
-                MUL A, C
+                MUL A, C            ; 0, 30000, 60000, 90000, 120000
                 60000 -> C
-                SUB A, C
+                SUB A, C            ; -60000, -30000, 0, 30000, 60000
                 CENTER_X -> C
-                ADD A, C        ; X_FP = CENTER_X + offset
+                ADD A, C            ; X_FP
                 A -> [body_x_curr + I]
                 A -> [body_x_next + I]
 
+                ; 2. Symmetrische Y-verdeling rond CENTER_Y (-90.000 tot +90.000)
                 I -> A
                 7 -> C
-                MOD A, C        ; A = I % 7
+                MOD A, C            ; A = I % 7 (0..6)
                 30000 -> C
-                MUL A, C
-                80000 -> C
-                SUB A, C
+                MUL A, C            ; 0 t/m 180000
+                90000 -> C          ; Aangepast naar 90000 voor exacte symmetrie!
+                SUB A, C            ; -90000 t/m +90000
                 CENTER_Y -> C
-                ADD A, C        ; Y_FP = CENTER_Y + offset
+                ADD A, C            ; Y_FP
                 A -> [body_y_curr + I]
                 A -> [body_y_next + I]
 
-                ; Tangentiële start-impuls rondom het barycentrum
+                ; 3. Tangentiële start-impuls AANGEPAST AAN SCHERM-Y
                 [body_y_curr + I] -> A
                 CENTER_Y -> C
-                SUB A, C
+                SUB A, C            ; A = Y - CENTER_Y
                 DIVI A, 10
                 A -> [body_vx + I]
 
                 [body_x_curr + I] -> A
                 CENTER_X -> C
-                SUB A, C
-                MULI A, -1
-                DIVI A, 10
+                SUB A, C            ; A = X - CENTER_X
+                DIVI A, 10          ; GEEN MULI A, -1 meer! Scherm-Y gecorrigeerd.
                 A -> [body_vy + I]
 
-                1000 -> A       ; Lichte massa
+                1000 -> A           ; Lichte massa
                 A -> [body_m + I]
             }
         }
