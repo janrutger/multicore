@@ -91,10 +91,10 @@ SIMULATION_DIRECTOR:
     LDI X, 0
     LDI Y, 0
     LDI Z, 0
-    LDI B, 12
+    LDI B, 16
     LDI A, 0
     STO A, 1600
-    LDI A, 12
+    LDI A, 16
     LDI Z, 16
 ; --- IF STATEMENT START (ID: 1) ---
     TSTG A, Z
@@ -105,7 +105,7 @@ __IF_ELSE_1:
     LDI X, 4
 __IF_END_1:
 ; --- IF STATEMENT END ---
-    LDI A, 12
+    LDI A, 16
     LD Z, X
     DIV A, Z
     LD Y, A
@@ -161,7 +161,7 @@ __REP_START_2:
     LDI A, 2500
     STX A, 1408
     INC I
-    LDI B, 12
+    LDI B, 16
     TSTE I, B
     JMPF __REP_START_2
 ; --- REPEAT LOOP END ---
@@ -170,7 +170,7 @@ __REP_START_2:
 
 SIMULATION_TICK:
     LDI I, 0
-    LDI B, 12
+    LDI B, 16
 ; --- REPEAT LOOP START ---
 __REP_START_3:
 ; --- Start hygiënische macro: startTask (ID: 1) ---
@@ -181,7 +181,7 @@ __M1__spawntask:
 __M1__spawnd:
 ; --- Einde macro: startTask ---
     INC I
-    LDI B, 12
+    LDI B, 16
     TSTE I, B
     JMPF __REP_START_3
 ; --- REPEAT LOOP END ---
@@ -194,7 +194,7 @@ __M2__waitMatrix:
     MSG_START B, I
     MSG_DONE I
     LDI M, 0
-    LDI B, 12
+    LDI B, 16
 
 SWAP_LOOP:
     LD I, M
@@ -224,7 +224,7 @@ SWAP_LOOP:
     MSG_WRITE I, Z
     MSG_DONE I
     INC M
-    LDI B, 12
+    LDI B, 16
 ; --- IF STATEMENT START (ID: 4) ---
     TSTE M, B
     JMPT __IF_END_4
@@ -285,7 +285,7 @@ __IF_END_5:
     LD I, M
     LDX C, 1088
     LDI L, 0
-    LDI Z, 12
+    LDI Z, 16
 ; --- REPEAT LOOP START ---
 __REP_START_9:
     TSTE L, M
@@ -431,7 +431,7 @@ __IF_END_8:
     ADD Y, A
 _skip_self:
     INC L
-    LDI Z, 12
+    LDI Z, 16
     TSTE L, Z
     JMPF __REP_START_9
 ; --- REPEAT LOOP END ---

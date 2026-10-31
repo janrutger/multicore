@@ -92,55 +92,6 @@ class CPU:
 
 
     
-    # def tick(self):
-    #     """Voert één volledige kloksnelheid-cyclus uit voor het hele systeem."""
-        
-    #     # ==========================================================
-    #     # 1. uCORE MATRIX TICKS (Eén meting voor álle cores samen)
-    #     # ==========================================================
-    #     t0 = time.perf_counter()
-    #     for core_id, core in enumerate(self.cores):
-    #         core.tick()
-
-    #         # --- STAP A: Geef de reeds IDLE cores terug aan de wachtrij ---
-    #         if core.coreStatus == 'IDLE' and core_id not in self.free_cores:
-    #             self.free_cores.append(core_id)
-                
-    #     t1 = time.perf_counter()
-    #     self.time_ucore += (t1 - t0)
-
-    #     # ==========================================================
-    #     # 2. GARBAGE COLLECTION / WEZEN-CHECK (Eén meting voor de hele check)
-    #     # ==========================================================
-    #     t0 = time.perf_counter()
-    #     for core_id, core in enumerate(self.cores):
-    #         if core.coreStatus == 'VALID':
-    #             # 1. Check Master CPU registers
-    #             in_master_register = any(reg_id == core_id for reg_id in self.registers.values())
-                
-    #             # 2. Check ALLE threads die nog in het systeem zitten (ongeacht FSM status!)
-    #             in_thread_register = False
-    #             for ctx in self.contexts:
-    #                 if any(reg_id == core_id for reg_id in ctx.registers.values()):
-    #                     in_thread_register = True
-    #                     break
-                        
-    #             is_test_core = (self.last_test_core == core_id)
-                
-    #             # 3. Check of er een WORKING core is die deze core nodig heeft
-    #             wordt_nog_bezocht = False
-    #             for andere_core in self.cores:
-    #                 if andere_core.coreStatus == 'WORKING':
-    #                     if andere_core.arg1 == core_id or andere_core.arg2 == core_id:
-    #                         wordt_nog_bezocht = True
-    #                         break
-                
-    #             # Alleen slopen als hij énkel door helemaal niemand meer geclaimd wordt
-    #             if not in_master_register and not in_thread_register and not is_test_core and not wordt_nog_bezocht:
-    #                 core.coreStatus = 'IDLE'
-                    
-    #     t1 = time.perf_counter()
-    #     self.time_gc += (t1 - t0)
     def tick(self):
         """Voert één volledige kloksnelheid-cyclus uit voor het hele systeem."""
         

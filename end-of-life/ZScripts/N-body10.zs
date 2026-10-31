@@ -7,8 +7,8 @@ MAP {
     START main
 
     ; === CONSTANTEN & CONFIGURATIE ===
-    CONST NUM_BODIES 16         ; 16 lichte deeltjes die op elkaar jagen
-    CONST MAX_STEPS 3000        ; Aantal simulatieframes
+    CONST NUM_BODIES 12         ; 16 lichte deeltjes die op elkaar jagen
+    CONST MAX_STEPS 2500        ; Aantal simulatieframes
     CONST CENTER_X 320000       ; Schermmidden X (320 * 1000 Q1000)
     CONST CENTER_Y 240000       ; Schermmidden Y (240 * 1000 Q1000)
     CONST FP_SCALE 1000         ; Q1000 Fixed-Point schaal

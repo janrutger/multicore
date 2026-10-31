@@ -123,27 +123,6 @@ class CIU:
     # =========================================================================
     # BUS-GEBASEERDE FUNCTIONALITEIT (RCONTEXT, RBOOT, ALLSYNC)
     # =========================================================================
-
-    # def request_remote_context(self, task_pc, arg_reg, arg_val, target_cpu_id=None):
-    #     """Injecteert een context op een specifieke doel-CPU of zoekt op de bus."""
-    #     my_id = getattr(self.cpu, 'ID', 0)
-    #     packet = (CMD_CONTEXT, arg_reg, arg_val, task_pc, my_id)
-
-    #     if not self.bus:
-    #         return False
-
-    #     # Als er een specifiek target_cpu_id is opgegeven
-    #     if target_cpu_id is not None:
-    #         return self.bus.send_packet(target_cpu_id, packet)
-
-    #     # Anders: Broadcast/Round-Robin over beschikbare knopen op de bus
-    #     for cpu_id, target_ciu in self.bus.nodes.items():
-    #         if cpu_id == my_id:
-    #             continue
-    #         if target_ciu.receive_packet(packet):
-    #             return True
-
-    #     return False
     def request_remote_context(self, task_pc, arg_reg, arg_val, target_cpu_id=None):
         my_id = getattr(self.cpu, 'ID', 0)
         packet = (CMD_CONTEXT, arg_reg, arg_val, task_pc, my_id)
