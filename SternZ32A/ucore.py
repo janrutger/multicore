@@ -224,7 +224,7 @@ class Ucore:
                     self.upc += 1
 
         elif uinstruction == 'rol32_vw':
-            shift = self.work
+            shift = self.work & 0x1F          # Beperk shift strikt tot 0 t/m 31 (modulo 32)
             val   = self.value & 0xFFFFFFFF   # maak Val 32 bits (high numbers loose precision)
             self.value = ((val << shift) | (val >> (32 - shift))) & 0xFFFFFFFF
             self.upc += 1

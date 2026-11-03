@@ -8,7 +8,7 @@ MAP {
 
     ; === CONSTANTEN & CONFIGURATIE ===
     CONST NUM_BODIES 12         ; 2 zware sterren + 6 or more vrije elementen
-    CONST MAX_STEPS 5000        ; Aantal simulatieframes
+    CONST MAX_STEPS 2500        ; Aantal simulatieframes
     CONST CENTER_X 320000       ; Schermmidden X (320 * 1000 Q1000)
     CONST CENTER_Y 240000       ; Schermmidden Y (240 * 1000 Q1000)
     CONST FP_SCALE 1000         ; Q1000 Fixed-Point schaal

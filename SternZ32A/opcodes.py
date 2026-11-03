@@ -50,7 +50,7 @@ class Op(IntEnum):
     SHIFTL   = 43      # Implemented
     SHIFTR   = 46      # Implemented
     ROTL32   = 44      # Implemented
-    SM32_RND = 45      # Implemented
+    RND32    = 45      # Implemented
 
     # --- FORMAT: TWO_REG_REG ---
     LD    = 30      # Implemented 
@@ -100,7 +100,7 @@ FORMAT_TWO_REG_REG = {
 }
 FORMAT_TWO_REG_VAL = {
     Op.LDI, Op.LDM, Op.LDX, Op.OUT, Op.IN, Op.STO, Op.STX, 
-    Op.SHIFTL, Op.SHIFTR, Op.ROTL32, Op.SM32_RND, Op.CONTEXT, Op.JOIN, 
+    Op.SHIFTL, Op.SHIFTR, Op.ROTL32, Op.RND32, Op.CONTEXT, Op.JOIN, 
     Op.ADDI, Op.SUBI, Op.MULI, Op.DIVI, Op.TST, Op.ANDI, Op.RCONTEXT,
     Op.RBOOT, 
 }
@@ -211,17 +211,26 @@ MICROCODE_ROM = {
     ],
 
 
-    'sm32_rnd': [
-        'valid_v',         # 0: Wacht op invoer V
-        'mv_tw',           # 1: Laad de immediate integer (bijv. 7) in W
+    # 'sm32_rnd': [
+    #     'valid_v',         # 0: Wacht op invoer V
+    #     'mv_tw',           # 1: Laad de immediate integer (bijv. 7) in W
         
-        # --- HARDWARE SHUFFLE ---
-        #'shftl_vw',        # 2: V = V << W (Shift de sleutel met 7)
-        'rol32_vw', 
-        'add',             # 3: V = V + W  (Tel de mixer-waarde 7 erbij op)
-        'rol32_vw',        # 4: V = V ROL32 W (Roteer het resultaat nogmaals met 7)
+    #     # --- HARDWARE SHUFFLE ---
+    #     #'shftl_vw',        # 2: V = V << W (Shift de sleutel met 7)
+    #     'rol32_vw', 
+    #     'add',             # 3: V = V + W  (Tel de mixer-waarde 7 erbij op)
+    #     'rol32_vw',        # 4: V = V ROL32 W (Roteer het resultaat nogmaals met 7)
         
-        'setResult'        # 5: Klaar!
+    #     'setResult'        # 5: Klaar!
+    # ],
+    'rnd32': [
+        'valid_v',         # 0: Wacht op de invoerwaarde in V (de seed/state)
+        'mv_tw',           # 1: Laad de immediate constante in W
+        'rol32_vw',        # 2: Roteer V over W
+        'xor_vw',          # 
+        'add',             # 3: Tel W op bij V voor de mix
+        'rol32_vw',        # 4: Roteer nogmaals voor extra diffusie
+        'setResult'        # 5: Geef het nieuwe 32-bit pseudo-random getal vrij
     ],
 }
 

@@ -181,10 +181,22 @@ class SternZ32Mainboard:
         print("\n==========================================================")
         print("             SIMULATIE SUCCESVOL BEËINDIGD                ")
         print("==========================================================")
-        print(f"Aantal CPU's : {self.num_cpus}")
-        print(f"Totale Ticks : {self.totale_ticks}")
-        print(f"Totale Tijd  : {totale_tijd:.4f} seconden")
-        print(f"Snelheid     : {khz:.2f} kHz op de host machine.")
+        print(f"Aantal CPU's              : {self.num_cpus}")
+        print(f"Totale Ticks              : {self.totale_ticks}")
+        print(f"Totale Tijd               : {totale_tijd:.4f} seconden")
+        print(f"Snelheid                  : {khz:.2f} kHz op de host machine.")
+        print("=========================================================")
+        print("                        MMU BUS                          ")
+        print("==========================================================")
+        print(f"Totale Geheugen Reads     : {self.mmu.stats['reads']:,}")
+        print(f"Totale Geheugen Writes    : {self.mmu.stats['writes']:,}")
+        print(f"Shared Memory Reads       : {self.mmu.stats['shared_reads']:,}")
+        print(f"Shared Memory Writes      : {self.mmu.stats['shared_writes']:,}")
+        print(f"Totale Bus hits (no-lock) : {self.mmu.stats['hits']:,}")
+        print(f"Totale Bus Stalls (Lock)  : {self.mmu.stats['stalls']:,}")
+        if self.mmu.stats['writes'] > 0:
+            stall_pct = (self.mmu.stats['stalls'] / self.mmu.stats['writes']) * 100
+            print(f"Stall-ratio (t.o.v. write): {stall_pct:.2f}%")
         print("==========================================================\n")
 
         print("\n==========================================================")
@@ -200,6 +212,8 @@ class SternZ32Mainboard:
         print(f"6. Panel Updates                    : {self.time_gui:8.2f} s  ({(self.time_gui/totale_tijd)*100:5.1f}%)")
         print(f"7. Python Runtime & TK-tasks        : {time_python_overhead:8.2f} s  ({(time_python_overhead/totale_tijd)*100:5.1f}%)")
         print("==========================================================\n")
+
+        
 
         print("==========================================================")
         print("               PER-CPU STATUS & PROFILING                 ")

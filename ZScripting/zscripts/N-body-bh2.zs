@@ -100,7 +100,7 @@ main:
     GRAPH_DEV -> A
     OUT A DEV
 
-    ; 2. Boot CPU 1 als de dedicated Simulatie Director (Remote Boot op Link 1)
+    ; 2. Boot CPU 1 als de dedicated Simulatie Director (Remote Boot op CPU 1)
     1 -> A
     RBOOT A SIMULATION_DIRECTOR
 
@@ -115,7 +115,7 @@ RENDER_LISTEN_LOOP:
         OUT A CMD
         IOSYNC
 
-        3 -> A                  ; Kleur 3 = Wit voor het centrale zwarte gat
+        3 -> A                  ; Kleur 3 = blauw voor het centrale zwarte gat
         OUT A VAL
         CENTER_X -> A
         DIVI A, FP_SCALE
@@ -128,7 +128,7 @@ RENDER_LISTEN_LOOP:
         IOSYNC
     }
 
-    ; B. Ontvang ELK INDIVIDUEEL deeltje zodra het binnenkomt over de bus
+    ; B. Verwerk ELK INDIVIDUEEL deeltje zodra het binnenkomt over de bus
     TAG_BODY_DATA -> K
     READ K (A, X, Y, Z) {
         ; A = deeltje ID, X = X-pos, Y = Y-pos, Z = status (1 = levend, -1 = dood)

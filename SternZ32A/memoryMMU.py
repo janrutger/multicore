@@ -42,6 +42,16 @@ class MMU:
         self.block_size = block_size
         self.cycle_locks = {}           # Onthoudt {block_id: cpu_id} voor de HUIDIGE klokcyclus
 
+        # Geheugen-statistieken / tellers
+        self.stats = {
+            "reads": 0,
+            "writes": 0,
+            "stalls": 0,
+            "hits": 0,
+            "shared_writes": 0,
+            "shared_reads": 0
+        }
+
     def create_private_page(self, cpu_id):
         if cpu_id not in self.privatedPages:
             self.privatedPages[cpu_id] = [0] * self.privatePageSize
@@ -58,6 +68,10 @@ class MMU:
         self.cycle_locks.clear()
 
     def memRead(self, adres, cpu_id=0):
+        self.stats["reads"] += 1
+        if 1024 <= adres <= self.sharedEnd: # (of afhankelijk van je grenzen)
+            self.stats["shared_reads"] += 1
+
         if adres < 0 or adres > self.memEnd:
             raise ValueError(
                 f"Adres {adres} valt buiten het totale geheugenbereik (0 -"
@@ -81,6 +95,7 @@ class MMU:
             return self.privatedPages[cpu_id][offset]
 
     def memWrite(self, value, adres, cpu_id=0):
+        self.stats["writes"] += 1
         if adres < 0 or adres > self.memEnd:
             raise ValueError(
                 f"Adres {adres} valt buiten het totale geheugenbereik (0 -"
@@ -102,11 +117,16 @@ class MMU:
 
             # Als het blok vrij is of al geclaimd door DEZE cpu in deze cyclus
             if owner is None or owner == cpu_id:
+                self.stats["shared_writes"] += 1
+                if owner == cpu_id:
+                    self.stats["hits"] +=1
+                    
                 self.cycle_locks[block_id] = cpu_id
                 self.sharedMem[offset] = value
                 return "OK"
             else:
                 # Een ANDERE CPU was in deze klokcyclus al eerder met schrijven naar dit blok!
+                self.stats["stalls"] += 1
                 # print(f"Adres {adres} is locked, stalling to next tick")
                 return "STALL"
 

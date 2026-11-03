@@ -156,7 +156,7 @@ def _h_muli(master_cpu, target, reg1, arg2):   _exec_imm_ucore(master_cpu, targe
 def _h_divi(master_cpu, target, reg1, arg2):   _exec_imm_ucore(master_cpu, target, 'divi', reg1, arg2)
 def _h_shiftl(master_cpu, target, reg1, arg2): _exec_imm_ucore(master_cpu, target, 'shftl', reg1, arg2)
 def _h_shiftr(master_cpu, target, reg1, arg2): _exec_imm_ucore(master_cpu, target, 'shftr', reg1, arg2)
-def _h_sm32_rnd(master_cpu, target, reg1, arg2): _exec_imm_ucore(master_cpu, target, 'sm32_rnd', reg1, arg2)
+def _h_rnd32(master_cpu, target, reg1, arg2): _exec_imm_ucore(master_cpu, target, 'rnd32', reg1, arg2)
 def _h_rotl32(master_cpu, target, reg1, arg2): _exec_imm_ucore(master_cpu, target, 'rol32', reg1, arg2)
 
 def _h_inc(master_cpu, target, reg1, arg2):
@@ -674,7 +674,7 @@ EXEC_DISPATCH = {
     Op.ADD: _h_add,       Op.SUB: _h_sub,       Op.MUL: _h_mul,       Op.DIV: _h_div,
     Op.ADDI: _h_addi,     Op.SUBI: _h_subi,     Op.MULI: _h_muli,     Op.DIVI: _h_divi,
     Op.INC: _h_inc,       Op.DEC: _h_dec,       Op.MOD: _h_mod,       Op.XOR: _h_xor,
-    Op.SHIFTL: _h_shiftl, Op.SHIFTR: _h_shiftr, Op.SM32_RND: _h_sm32_rnd, Op.ROTL32: _h_rotl32,
+    Op.SHIFTL: _h_shiftl, Op.SHIFTR: _h_shiftr, Op.RND32: _h_rnd32,   Op.ROTL32: _h_rotl32,
 
     # Comparisons & Test
     Op.TST: _h_tst,       Op.TSTE: _h_tste,     Op.TSTG: _h_tstg,     Op.TSTZ: _h_tstz,
