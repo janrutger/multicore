@@ -7,9 +7,9 @@ MAP {
     START main
 
     ; === CONSTANTEN & CONFIGURATIE (400k RUN) ===
-    CONST TOTAL_ITERATIONS 1000000   ; 400.000 totaal
+    CONST TOTAL_ITERATIONS 3000000   ; 400.000 totaal
     CONST CHUNK_SIZE 10000          ; 10.000 iteraties per taakblok
-    CONST TOTAL_CHUNKS 100           ; 400.000 / 10.000 = 40 blokken totaal
+    CONST TOTAL_CHUNKS 300           ; 400.000 / 10.000 = 40 blokken totaal
     CONST R_SQUARED 1073741849      ; 32767^2 (15-bit coördinaten)
     
     CONST TAG_RESULT 100            ; Mailbox tag voor hit-resultaten
@@ -107,12 +107,12 @@ PI_CHUNK_WORKER:
 
 WORKER_LOOP:
     rand(A, 17)
-    LD M, A
-    MUL A, M                    ; A = X^2
+   ;LD M, A
+    MUL A, A                    ; A = X^2
 
     rand(B, 17)
-    LD M, B
-    MUL B, M                    ; B = Y^2
+    ;LD M, B
+    MUL B, B                    ; B = Y^2
 
     ADD A, B                    ; A = X^2 + Y^2
     R_SQUARED -> M
