@@ -488,7 +488,42 @@ class ZScriptExpander(Transformer):
 
 
 
+    def atomic_stmt(self, tree_or_list):
+        """
+        ZScripting: ATOMIC MUTEX_LOCK { code block }
+        Expandeert automatisch naar de low-level spin-loop, kritieke sectie en unlock.
+        """
+        children = tree_or_list.children if hasattr(tree_or_list, 'children') else tree_or_list
+        
+        mutex_arg = str(children[1]).strip()
+        body_items = children[2:] if len(children) > 2 else []
 
+        self.loop_counter += 1
+        atomic_id = self.loop_counter
+
+        acquire_label = f"__ATOMIC_ACQUIRE_{atomic_id}"
+        crit_label = f"__ATOMIC_CRIT_{atomic_id}"
+
+        asm_output = []
+        asm_output.append(f"; --- START ATOMIC BLOCK (ID: {atomic_id}) ---")
+        asm_output.append(f"{acquire_label}:")
+        asm_output.append(f"    LOCK {mutex_arg}")
+        asm_output.append(f"    SUCCES {crit_label}")
+        asm_output.append(f"    JMP {acquire_label}")
+        asm_output.append(f"{crit_label}:")
+
+        # Verwerk de instructies binnen het atomaire blok
+        for item in body_items:
+            if item is not None:
+                item_str = str(item).strip()
+                if item_str and item_str not in ("{", "}"):
+                    formatted = item_str if (item_str.startswith(";") or item_str.endswith(":") or item_str.startswith("    ")) else f"    {item_str}"
+                    asm_output.append(formatted)
+
+        asm_output.append(f"    UNLOCK {mutex_arg}")
+        asm_output.append(f"; --- END ATOMIC BLOCK ---")
+
+        return "\n".join(asm_output)
 
 
     # --- DE REPEAT GENERATOR ---

@@ -25,6 +25,10 @@ class Op(IntEnum):
     SYNC    = 18      # Implemented
     ALLSYNC = 19      # Cluster-brede Barrier Sync
 
+    # --- NIEUWE ATOMIC LOCK OPCODES ---
+    LOCK    = 23      # Atomaire test-and-set op shared memory adres (set SUCCES)
+    UNLOCK  = 24      # Geef shared memory mutex weer vrij
+
     # --- FORMAT: TWO_REG_VAL / TWO_REG_ADDR --- 
     LDI   = 31      # Implemented
     LDM   = 32      # Implemented
@@ -38,14 +42,14 @@ class Op(IntEnum):
     MULI  = 61      # Implemented
     DIVI  = 63      # Implemented
     TST   = 70      # Implemented
-    ANDI  = 82
+    ANDI  = 82      # Implemented
     # STACK = 92
     # USTACK= 93
 
     CONTEXT = 27      # Implemented
     JOIN    = 28      # Implemented
-    RCONTEXT= 36  # Remote Context Injection via CIU
-    RBOOT   = 37  # Remote CPU Boot via CIU
+    RCONTEXT= 36      # Remote Context Injection via CIU
+    RBOOT   = 37      # Remote CPU Boot via CIU
 
     SHIFTL   = 43      # Implemented
     SHIFTR   = 46      # Implemented
@@ -78,8 +82,8 @@ class Op(IntEnum):
     INC   = 80     # Implemented
     DEC   = 81     # Implemented
     TSTZ  = 73     # Implemented
-    CPUID = 96
-    PID   = 94
+    CPUID = 96     # Implemented
+    PID   = 94     # Implemented
 
     # --- CIU MAILBOX API (FORMAT: ONE_REG) ---
     MSG_DONE  = 85  # msg_done Ry      (Ry = TxSlotID)
@@ -89,7 +93,10 @@ class Op(IntEnum):
 
 # Vaste sets voor de decoder om snel het format te matchen
 FORMAT_ZERO        = {Op.NOP, Op.HALT, Op.CLOSE, Op.IOSYNC, Op.AUTOCLOSE, Op.SUSPEND}
-FORMAT_ONE_ADDR    = {Op.JMPF, Op.JMPT, Op.JMP, Op.SUCCES, Op.FAIL, Op.SYNC, Op.ALLSYNC}
+FORMAT_ONE_ADDR    = {
+    Op.JMPF, Op.JMPT, Op.JMP, Op.SUCCES, Op.FAIL, 
+    Op.SYNC, Op.ALLSYNC, Op.LOCK, Op.UNLOCK
+}
 FORMAT_ONE_REG     = {
     Op.INC, Op.DEC, Op.TSTZ, Op.CPUID, Op.PID,
     Op.MSG_DONE, Op.MSG_OPEN, Op.MSG_CLOSE, Op.MSG_PROBE
@@ -148,7 +155,9 @@ MICROCODE_ROM = {
     'cmpgt':  ['valid_v', 'valid_w', 'cmpgt', 'setResult'],
     'cmplt':  ['valid_v', 'valid_w', 'cmplt', 'setResult'],
 
+    'andi':   ['valid_v', 'mv_tw',   'and_vw',   'setResult'],
     'xor_vw': ['valid_v', 'valid_w', 'xor_vw',   'setResult'],
+
     'shftl':  ['valid_v', 'mv_tw',   'shftl_vw', 'setResult'],
     'shftr':  ['valid_v', 'abs_v',   'mv_tw',    'shftr_vw',   'setResult'],
     'rol32':  ['valid_v', 'mv_tw',   'rol32_vw', 'setResult'],
@@ -157,6 +166,8 @@ MICROCODE_ROM = {
     'subi':   ['valid_v', 'mv_tw', 'sub', 'setResult'],
     'muli':   ['valid_v', 'mv_tw', 'mul', 'setResult'],
     'divi':   ['valid_v', 'mv_tw', 'div', 'setResult'],
+
+    
 
 
    'slow_mul': [

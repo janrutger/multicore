@@ -42,7 +42,11 @@ param_list: IDENTIFIER ("," IDENTIFIER)*
 program_block: _PROGRAM_KW "{" (_NL | program_line)* "}"
 
 // === PROGRAM LINES (UITGEBREID MET write_stmt EN read_stmt) ===
-?program_line: label_def _NL? | (instruction | assignment | macro_call | repeat_stmt | if_stmt | spawn_stmt | write_stmt | read_stmt) _NL
+?program_line: label_def _NL? | (instruction | assignment | macro_call | repeat_stmt | if_stmt | spawn_stmt | write_stmt | read_stmt | atomic_stmt) _NL
+
+// === ATOMIC STATEMENT DEFINITIE ===
+atomic_stmt: ATOMIC_KEYWORD argument _NL? "{" (_NL | program_line)* "}"
+ATOMIC_KEYWORD.2: "ATOMIC"
 
 assignment: assign_source "->" assign_target
 ?assign_source: REGISTER | INT | IDENTIFIER | mem_ref
@@ -89,7 +93,7 @@ instruction: MNEMONIC [argument (","? argument)*]
 macro_call: IDENTIFIER ["(" [arg_list] ")"]
 arg_list:   argument (","? argument)*
 
-MNEMONIC.2: /\\b(MSG_START|MSG_WRITE|MSG_DONE|MSG_OPEN|MSG_PROBE|MSG_READ|MSG_CLOSE|LDI|CONTEXT|RCONTEXT|ALLSYNC|RBOOT|OUT|IN|HALT|SUSPEND|CPUID|PID|JMP|INC|DEC|STO|STX|LDX|LDM|LD|MUL|JOIN|CLOSE|AUTOCLOSE|TSTE|FAIL|SUCCES|SYNC|ADD|SUB|MOD|TSTG|XOR|JMPT|JMPF|TSTZ|IOSYNC|RND32|SHIFTR|SHIFTL|ADDI|SUBI|MULI|DIV|DIVI|TST)\\b/
+MNEMONIC.2: /\\b(MSG_START|MSG_WRITE|MSG_DONE|MSG_OPEN|MSG_PROBE|MSG_READ|MSG_CLOSE|LDI|CONTEXT|RCONTEXT|ALLSYNC|RBOOT|OUT|IN|HALT|SUSPEND|CPUID|PID|JMP|INC|DEC|STO|STX|LDX|LDM|LD|MUL|JOIN|CLOSE|AUTOCLOSE|TSTE|FAIL|SUCCES|SYNC|ADD|SUB|MOD|TSTG|XOR|ANDI|JMPT|JMPF|TSTZ|IOSYNC|RND32|SHIFTR|SHIFTL|ADDI|SUBI|MULI|DIV|DIVI|TST|LOCK|UNLOCK)\\b/
 REGISTER.2: /\\b(A|B|C|D|K|L|M|X|Y|Z|I)\\b/
 COMPARATOR.2: "==" | "!=" | ">" | "<"
 IDENTIFIER.1: /[a-zA-Z_][a-zA-Z0-9_\\-]*/

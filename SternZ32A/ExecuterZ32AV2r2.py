@@ -150,13 +150,14 @@ def _h_div(master_cpu, target, reg1, arg2):    _exec_binary_ucore(master_cpu, ta
 def _h_mod(master_cpu, target, reg1, arg2):    _exec_binary_ucore(master_cpu, target, 'mod', reg1, arg2)
 def _h_xor(master_cpu, target, reg1, arg2):    _exec_binary_ucore(master_cpu, target, 'xor_vw', reg1, arg2)
 
+def _h_andi(master_cpu, target, reg1, arg2):   _exec_imm_ucore(master_cpu, target, 'andi', reg1, arg2)
 def _h_addi(master_cpu, target, reg1, arg2):   _exec_imm_ucore(master_cpu, target, 'addi', reg1, arg2)
 def _h_subi(master_cpu, target, reg1, arg2):   _exec_imm_ucore(master_cpu, target, 'subi', reg1, arg2)
 def _h_muli(master_cpu, target, reg1, arg2):   _exec_imm_ucore(master_cpu, target, 'muli', reg1, arg2)
 def _h_divi(master_cpu, target, reg1, arg2):   _exec_imm_ucore(master_cpu, target, 'divi', reg1, arg2)
 def _h_shiftl(master_cpu, target, reg1, arg2): _exec_imm_ucore(master_cpu, target, 'shftl', reg1, arg2)
 def _h_shiftr(master_cpu, target, reg1, arg2): _exec_imm_ucore(master_cpu, target, 'shftr', reg1, arg2)
-def _h_rnd32(master_cpu, target, reg1, arg2): _exec_imm_ucore(master_cpu, target, 'rnd32', reg1, arg2)
+def _h_rnd32(master_cpu, target, reg1, arg2):  _exec_imm_ucore(master_cpu, target, 'rnd32', reg1, arg2)
 def _h_rotl32(master_cpu, target, reg1, arg2): _exec_imm_ucore(master_cpu, target, 'rol32', reg1, arg2)
 
 def _h_inc(master_cpu, target, reg1, arg2):
@@ -225,6 +226,30 @@ def _h_tstz(master_cpu, target, reg1, arg2):
     master_cpu.cores[core_id].dispatch('tstz', arg1=src1_core, arg2=None)
     target.registers[reg1] = core_id
     target.last_test_core = core_id
+    target.fsm_state = 'FETCH'
+
+def _h_lock(master_cpu, target, reg1, arg2):
+    # arg2 is het shared memory adres van de mutex
+    current_val = master_cpu.memory.memRead(arg2, master_cpu.ID)
+    if current_val == 0:
+        # Probeer atomair 1 te schrijven (Test-and-Set)
+        status = master_cpu.memory.memWrite(1, adres=arg2, cpu_id=master_cpu.ID)
+        if status == "STALL":
+            target.fsm_state = 'EXECUTE'
+            return
+        target.status = 1  # Gelukt! Lock is verkregen (SUCCES = True)
+    else:
+        target.status = 0  # Bezet! Lock is al in gebruik (SUCCES = False)
+        # print("DEBUG locked")
+    target.fsm_state = 'FETCH'
+
+def _h_unlock(master_cpu, target, reg1, arg2):
+    # arg2 is het shared memory adres van de mutex
+    status = master_cpu.memory.memWrite(0, adres=arg2, cpu_id=master_cpu.ID)
+    if status == "STALL":
+        target.fsm_state = 'EXECUTE'
+        return
+    target.status = 1
     target.fsm_state = 'FETCH'
 
 # --- MEMORY STORE HANDLERS ---
@@ -494,33 +519,6 @@ def _h_iosync(master_cpu, target, reg1, arg2):
     target.fsm_state = 'FETCH'
 
 # --- CIU MAILBOX HANDLERS ---
-# def _h_msg_start(master_cpu, target, reg1, arg2):
-#     rx_core_id = target.registers[reg1]
-#     ry_core_id = target.registers[arg2]
-#     if rx_core_id is None or ry_core_id is None:
-#         target.fsm_state = 'EXECUTE'
-#         return
-        
-#     core_rx = master_cpu.cores[rx_core_id]
-#     core_ry = master_cpu.cores[ry_core_id]
-#     if core_rx.coreStatus != 'VALID' or core_ry.coreStatus != 'VALID':
-#         target.fsm_state = 'EXECUTE'
-#         return
-        
-#     if not master_cpu.free_cores:
-#         target.fsm_state = 'EXECUTE'
-#         return
-
-#     parent_id = getattr(target, 'parent_cpu_id', getattr(target, 'parent_id', getattr(master_cpu, 'parent_id', 0)))
-#     success, tx_id = master_cpu.ciu.msg_start(core_rx.value, core_ry.value, parent_id)
-#     target.status = 1 if success else 0
-
-#     if success:
-#         core_id = master_cpu.free_cores.popleft()
-#         master_cpu.cores[core_id].transfer = tx_id
-#         master_cpu.cores[core_id].dispatch('ldv')
-#         target.registers[arg2] = core_id
-#     target.fsm_state = 'FETCH'
 def _h_msg_start(master_cpu, target, reg1, arg2):
     rx_core_id = target.registers[reg1]
     ry_core_id = target.registers[arg2]
@@ -673,7 +671,7 @@ EXEC_DISPATCH = {
     # Arithmetic
     Op.ADD: _h_add,       Op.SUB: _h_sub,       Op.MUL: _h_mul,       Op.DIV: _h_div,
     Op.ADDI: _h_addi,     Op.SUBI: _h_subi,     Op.MULI: _h_muli,     Op.DIVI: _h_divi,
-    Op.INC: _h_inc,       Op.DEC: _h_dec,       Op.MOD: _h_mod,       Op.XOR: _h_xor,
+    Op.INC: _h_inc,       Op.DEC: _h_dec,       Op.MOD: _h_mod,       Op.XOR: _h_xor, Op.ANDI: _h_andi,
     Op.SHIFTL: _h_shiftl, Op.SHIFTR: _h_shiftr, Op.RND32: _h_rnd32,   Op.ROTL32: _h_rotl32,
 
     # Comparisons & Test
@@ -685,6 +683,7 @@ EXEC_DISPATCH = {
     # Control Flow & Branching
     Op.HALT: _h_halt,     Op.SUSPEND: _h_suspend, Op.JMP: _h_jmp,
     Op.JMPT: _h_jmpt,     Op.JMPF: _h_jmpf,     Op.SUCCES: _h_succes, Op.FAIL: _h_fail,
+    Op.LOCK: _h_lock,     Op.UNLOCK: _h_unlock,
 
     # Threading, Multi-Core & Parallelism
     Op.CONTEXT: _h_context,   Op.RCONTEXT: _h_rcontext, Op.SYNC: _h_sync,
