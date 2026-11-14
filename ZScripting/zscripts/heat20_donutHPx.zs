@@ -38,10 +38,11 @@ MAP {
     CONST GRAPH_DEV 2
     CONST PLOT_CMD 2
 
-    MACRO waitMatrix() {
-        _waitMatrix:
-        SYNC _waitMatrix
-    }
+    ; MACRO waitMatrix() {
+    ;     _waitMatrix:
+    ;     SYNC _waitMatrix
+    ; }
+    INCLUDE waitMatrix
 
     ; ==========================================================
     ; INTERLEAVED SPAWN MACRO (GEOPTIMALISEERD: ZONDER C EN M)
@@ -188,7 +189,7 @@ SIMULATIE_STAP:
     ; TSTZ Y
     [itterations] -> A 
     DEC A 
-    A ->[itterations]
+    A -> [itterations]
 
     TSTZ A
     JMPF SIMULATIE_STAP

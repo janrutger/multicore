@@ -40,24 +40,25 @@ MAP {
     CONST PLOT_CMD 2
 
     ; === MACRO'S ===
-    MACRO fmul_round(Rx, Ry, scale_val, half_val) {
-        MUL Rx, Ry
-        ADDI Rx, half_val
-        DIVI Rx, scale_val
-    }
+    ; MACRO fmul_round(Rx, Ry, scale_val, half_val) {
+    ;     MUL Rx, Ry
+    ;     ADDI Rx, half_val
+    ;     DIVI Rx, scale_val
+    ; }
 
-    ; Task-Dispatcher
-    MACRO startTask(task, arg) {
-        _spawntask:
-            RCONTEXT arg task       ; 1. Probeer remote worker via CIU
-            SUCCES _spawnd
+    ; ; Task-Dispatcher
+    ; MACRO startTask(task, arg) {
+    ;     _spawntask:
+    ;         RCONTEXT arg task       ; 1. Probeer remote worker via CIU
+    ;         SUCCES _spawnd
 
-            CONTEXT arg task        ; 2. Probeer lokaal op CPU 0
-            SUCCES _spawnd
+    ;         CONTEXT arg task        ; 2. Probeer lokaal op CPU 0
+    ;         SUCCES _spawnd
 
-            JMP _spawntask          ; Herhaal indien bezet
-        _spawnd:
-    }
+    ;         JMP _spawntask          ; Herhaal indien bezet
+    ;     _spawnd:
+    ; }
+    INCLUDE fmul_round startTask
 }
 
 PROGRAM {

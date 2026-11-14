@@ -29,23 +29,24 @@ MAP {
 
     ; === PRNG MACRO (Per context private SEED) ===
     PRIVATE SEED 1
-    MACRO rand(val, size) {
-        LDM val SEED
-        RND32 val 21
-        STO val SEED
-        SHIFTR val size
-    }
+    ; MACRO rand(val, size) {
+    ;     LDM val SEED
+    ;     RND32 val 21
+    ;     STO val SEED
+    ;     SHIFTR val size
+    ; }
 
-    ; === DYNAMISCHE TASK DISPATCHER (CIU & Lokaal) ===
-    MACRO startTask(task, arg) {
-        _spawntask:
-            RCONTEXT arg task       ; 1. Probeer remote worker via CIU netwerk
-            SUCCES _spawnd
-            CONTEXT arg task        ; 2. Probeer lokaal op CPU 0
-            SUCCES _spawnd
-            JMP _spawntask          ; Wacht tot er elders context-ruimte vrijkomt
-        _spawnd:
-    }
+    ; ; === DYNAMISCHE TASK DISPATCHER (CIU & Lokaal) ===
+    ; MACRO startTask(task, arg) {
+    ;     _spawntask:
+    ;         RCONTEXT arg task       ; 1. Probeer remote worker via CIU netwerk
+    ;         SUCCES _spawnd
+    ;         CONTEXT arg task        ; 2. Probeer lokaal op CPU 0
+    ;         SUCCES _spawnd
+    ;         JMP _spawntask          ; Wacht tot er elders context-ruimte vrijkomt
+    ;     _spawnd:
+    ; }
+    INCLUDE startTask, rand
 }
 
 PROGRAM {

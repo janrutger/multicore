@@ -1,0 +1,30 @@
+{
+  "name": "zscripting-vscode",
+  "displayName": "SternZ32 ZScripting Language",
+  "description": "Syntax highlighting en taalondersteuning voor de InmosZ32G ZScripting taal.",
+  "version": "1.0.0",
+  "publisher": "janrutger",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "zscript",
+        "aliases": ["ZScript", "zscript", "ZS"],
+        "extensions": [".zs", ".zscript"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "zscript",
+        "scopeName": "source.zscript",
+        "path": "./syntaxes/stern-asm.tmLanguage.json"
+      }
+    ]
+  }
+}

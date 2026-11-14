@@ -10,7 +10,7 @@ MAP {
     }
     START main
 
-    SHARED MUTEX_LOCK 1       ; De gedeelde mutex
+    SHARED MUTEX_LOCK 3       ; De gedeelde mutex
     SHARED SHARED_COUNTER 1   ; Gedeelde teller
     SHARED WORKER_LOG 1       ; Laatste schrijver log
     SHARED worker_retry 2     ; Retry tellers per worker
@@ -38,7 +38,7 @@ CONCURRENT_WORKER:
         STO K SHARED_COUNTER
 
         STO A WORKER_LOG
-        K -> [worker_retry + A]
+        K -> [MUTEX_LOCK + A]
     }
 
     AUTOCLOSE

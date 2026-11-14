@@ -2,12 +2,73 @@
 import argparse
 import os
 import sys
+import re
 from lark import Lark
 
 # Importeer de benodigdheden uit je bestaande bestanden
 from grammer import grammar
 from assemblerV3 import assemble
 from ZSparser import ZScriptExpander as MacroExpander
+
+
+def resolve_macro_includes(source_code, source_file_path, library_name="std_macros.zs"):
+    """
+    Scant naar 'INCLUDE macro1, macro2' en injecteert uitsluitend 
+    de gevraagde macro-definities uit het centrale macro-bestand.
+    Zoekt transparant in de map van het .zs bestand óf de huidige werkmap.
+    """
+    # 1. Bepaal het zoekpad: eerst in de map van het bronbestand, dan lokaal
+    source_dir = os.path.dirname(os.path.abspath(source_file_path))
+    library_path = os.path.join(source_dir, library_name)
+
+    # Fallback naar huidige werkomgeving als hij niet in de submap staat
+    if not os.path.exists(library_path):
+        library_path = library_name
+
+    # 2. Controleer of het macro-bestand bestaat zodra er een INCLUDE statement is
+    if not os.path.exists(library_path):
+        if "INCLUDE" in source_code:
+            raise FileNotFoundError(
+                f"\n[ZScript Preprocessor Fout] Macro-bibliotheek '{library_name}' niet gevonden!\n"
+                f"Gezocht op pad: '{os.path.abspath(library_path)}'"
+            )
+        return source_code
+
+    # 3. Lees alle macro's in uit het centrale bestand
+    with open(library_path, "r", encoding="utf-8") as f:
+        lib_content = f.read()
+
+    # Extraheer alle MACRO definities met hun inhoud
+    macro_pattern = r'(MACRO\s+([a-zA-Z0-9_]+)\s*\([^)]*\)\s*\{[^}]*\})'
+    available_macros = {}
+    for full_macro, macro_name in re.findall(macro_pattern, lib_content, re.DOTALL):
+        available_macros[macro_name] = full_macro
+
+    # 4. Zoek alle INCLUDE regels in het bronbestand
+    include_line_pattern = r'^\s*INCLUDE\s+([a-zA-Z0-9_,\s]+)$'
+    
+    def process_include(match):
+        raw_names = match.group(1)
+        # Filter leeg, spaties en eventueel dubbelgeschreven 'INCLUDE' eruit
+        requested_names = [
+            name.strip() for name in re.split(r'[,\s]+', raw_names) 
+            if name.strip() and name.strip().upper() != 'INCLUDE'
+        ]
+        
+        extracted_code = []
+        for name in requested_names:
+            if name in available_macros:
+                extracted_code.append(f"    ; --- INCLUDED MACRO: {name} ---")
+                extracted_code.append(available_macros[name])
+                print(f"[ZScript Preprocessor Load] Macro '{name}' succesvol geladen uit '{library_name}'")
+            else:
+                raise NameError(f"[ZScript Preprocessor Fout] Macro '{name}' niet gevonden in '{library_path}'!")
+        
+        return "\n".join(extracted_code)
+
+    # Gebruik re.MULTILINE zodat ^ en $ echt per regel werken
+    processed_source = re.sub(include_line_pattern, process_include, source_code, flags=re.MULTILINE | re.IGNORECASE)
+    return processed_source
 
 def main():
     parser = argparse.ArgumentParser(
@@ -50,8 +111,11 @@ def main():
 
     try:
         # 2. Lees de ZScript-broncode in
-        with open(args.input_file, "r") as f:
-            source_code = f.read()
+        with open(args.input_file, "r", encoding="utf-8") as f:
+            raw_source = f.read()
+
+        # 2b. Resolveer de macro includes (zoekt automatisch in de map van het .zs bestand!)
+        source_code = resolve_macro_includes(raw_source, source_file_path=args.input_file, library_name="std_macros.zs")
 
         # 3. Parse de ZScript-code met Lark
         lark_parser = Lark(grammar, parser='lalr')

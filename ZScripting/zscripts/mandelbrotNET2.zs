@@ -33,11 +33,12 @@ MAP {
     CONST PLOT_CMD 2
 
     ; === MACRO'S ===
-    MACRO fmul_round(Rx, Ry, scale_val, half_val) {
-        MUL Rx, Ry
-        ADDI Rx, half_val
-        DIVI Rx, scale_val
-    }
+    ; MACRO fmul_round(Rx, Ry, scale_val, half_val) {
+    ;     MUL Rx, Ry
+    ;     ADDI Rx, half_val
+    ;     DIVI Rx, scale_val
+    ; }
+    INCLUDE fmul_round
 }
 
 PROGRAM {
