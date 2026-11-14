@@ -41,8 +41,20 @@ param_list: IDENTIFIER ("," IDENTIFIER)*
 
 program_block: _PROGRAM_KW "{" (_NL | program_line)* "}"
 
-// === PROGRAM LINES (UITGEBREID MET write_stmt EN read_stmt) ===
-?program_line: label_def _NL? | (instruction | assignment | macro_call | repeat_stmt | if_stmt | spawn_stmt | write_stmt | read_stmt | atomic_stmt) _NL
+# // === PROGRAM LINES (UITGEBREID MET write_stmt EN read_stmt) ===
+# ?program_line: label_def _NL? | (instruction | assignment | macro_call | repeat_stmt | if_stmt | spawn_stmt | write_stmt | read_stmt | atomic_stmt) _NL
+
+// === PROGRAM LINES (UITGEBREID MET match_stmt) ===
+?program_line: label_def _NL? | (instruction | assignment | macro_call | repeat_stmt | if_stmt | spawn_stmt | write_stmt | read_stmt | atomic_stmt | match_stmt) _NL
+
+// === MATCH STATEMENT & GUARDS ===
+MATCH_KEYWORD.2:   "MATCH"
+DEFAULT_KEYWORD.2: "DEFAULT"
+
+match_stmt: MATCH_KEYWORD [argument] _NL? "{" (_NL | match_arm)* "}"
+match_cond: "(" if_condition ")" IF_MODE
+match_arm:  (argument | match_cond | DEFAULT_KEYWORD) "->" _NL? "{" (_NL | program_line)* "}"
+
 
 // === ATOMIC STATEMENT DEFINITIE ===
 atomic_stmt: ATOMIC_KEYWORD argument _NL? "{" (_NL | program_line)* "}"
@@ -94,7 +106,7 @@ macro_call: IDENTIFIER ["(" [arg_list] ")"]
 arg_list:   argument (","? argument)*
 
 MNEMONIC.2: /\\b(MSG_START|MSG_WRITE|MSG_DONE|MSG_OPEN|MSG_PROBE|MSG_READ|MSG_CLOSE|LDI|CONTEXT|RCONTEXT|ALLSYNC|RBOOT|OUT|IN|HALT|SUSPEND|CPUID|PID|JMP|INC|DEC|STO|STX|LDX|LDM|LD|MUL|JOIN|CLOSE|AUTOCLOSE|TSTE|FAIL|SUCCES|SYNC|ADD|SUB|MOD|TSTG|XOR|ANDI|JMPT|JMPF|TSTZ|IOSYNC|RND32|SHIFTR|SHIFTL|ADDI|SUBI|MULI|DIV|DIVI|TST|LOCK|UNLOCK)\\b/
-REGISTER.2: /\\b(A|B|C|D|K|L|M|X|Y|Z|I)\\b/
+REGISTER.2: /\\b(A|B|C|K|L|M|X|Y|Z|I)\\b/
 COMPARATOR.2: "==" | "!=" | ">" | "<"
 IDENTIFIER.1: /[a-zA-Z_][a-zA-Z0-9_\\-]*/
 

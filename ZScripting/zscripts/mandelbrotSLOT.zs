@@ -58,7 +58,8 @@ MAP {
     ;         JMP _spawntask          ; Herhaal indien bezet
     ;     _spawnd:
     ; }
-    INCLUDE fmul_round startTask
+    INCLUDE fmul_round
+    INCLUDE startTask
 }
 
 PROGRAM {

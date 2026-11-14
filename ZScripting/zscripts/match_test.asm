@@ -1,0 +1,114 @@
+; --- BOOTSTRAP VECTOR ---
+    JMP MAIN
+; ------------------------
+
+main:
+    LDI A, 0
+; --- MATCH STATEMENT START (ID: 0) ---
+    TST A, 0
+    JMPF __MATCH_0_ARM_1
+    LDI B, 10
+    STO B, 1024
+    JMP __MATCH_END_0
+__MATCH_0_ARM_1:
+    TST A, 42
+    JMPF __MATCH_0_ARM_2
+    LDI B, 999
+    STO B, 1024
+    JMP __MATCH_END_0
+__MATCH_0_ARM_2:
+    LDI B, 888
+    STO B, 1024
+__MATCH_END_0:
+; --- MATCH STATEMENT END ---
+    LDI A, 42
+    LDI I, 1
+; --- MATCH STATEMENT START (ID: 1) ---
+    TST A, 0
+    JMPF __MATCH_1_ARM_1
+    LDI B, 999
+    STX B, 1024
+    JMP __MATCH_END_1
+__MATCH_1_ARM_1:
+    TST A, 42
+    JMPF __MATCH_1_ARM_2
+    LDI B, 20
+    STX B, 1024
+    JMP __MATCH_END_1
+__MATCH_1_ARM_2:
+    LDI B, 888
+    STX B, 1024
+__MATCH_END_1:
+; --- MATCH STATEMENT END ---
+    LDI A, 99
+    LDI B, 10
+    LDI C, 50
+    LDI M, 0
+    LDI I, 2
+; --- MATCH STATEMENT START (ID: 2) ---
+    TST A, 0
+    JMPF __MATCH_2_ARM_1
+    LDI M, 999
+    STX M, 1024
+    JMP __MATCH_END_2
+__MATCH_2_ARM_1:
+    TSTG C, B
+    JMPF __MATCH_2_ARM_2
+    LDI M, 30
+    STX M, 1024
+    JMP __MATCH_END_2
+__MATCH_2_ARM_2:
+    LDI M, 888
+    STX M, 1024
+__MATCH_END_2:
+; --- MATCH STATEMENT END ---
+    LDI A, 7
+    LDI I, 3
+; --- MATCH STATEMENT START (ID: 3) ---
+    TST A, 0
+    JMPF __MATCH_3_ARM_1
+    LDI B, 999
+    STX B, 1024
+    JMP __MATCH_END_3
+__MATCH_3_ARM_1:
+    TST A, 1
+    JMPF __MATCH_3_ARM_2
+    LDI B, 888
+    STX B, 1024
+    JMP __MATCH_END_3
+__MATCH_3_ARM_2:
+    LDI B, 99
+    STX B, 1024
+__MATCH_END_3:
+; --- MATCH STATEMENT END ---
+    LDI B, 55
+    LDI I, 4
+    LDI A, 5
+; --- MATCH STATEMENT START (ID: 4) ---
+    TST A, 1
+    JMPF __MATCH_4_ARM_1
+    LDI B, 999
+    JMP __MATCH_END_4
+__MATCH_4_ARM_1:
+    TST A, 2
+    JMPF __MATCH_END_4
+    LDI B, 888
+__MATCH_END_4:
+; --- MATCH STATEMENT END ---
+    STX B, 1024
+    LDI X, 15
+    LDI I, 5
+; --- MATCH STATEMENT START (ID: 5) ---
+    TSTZ X
+    JMPF __MATCH_5_ARM_1
+    LDI B, 999
+    STX B, 1024
+    JMP __MATCH_END_5
+__MATCH_5_ARM_1:
+    TSTE X, B
+    JMPT __MATCH_END_5
+    LDI B, 77
+    STX B, 1024
+__MATCH_END_5:
+; --- MATCH STATEMENT END ---
+    HALT

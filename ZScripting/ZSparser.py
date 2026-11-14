@@ -833,6 +833,124 @@ class ZScriptExpander(Transformer):
         asm.append(f"; --- IF STATEMENT END ---")
 
         return "\n".join(asm)
+    
+    def match_cond(self, items):
+        """
+        Verpakt een conditionele guard uit een MATCH-arm in een herkenbare dict.
+        items[0] is de dict van if_condition, items[1] is 'TRUE' of 'FALSE'.
+        """
+        cond = items[0]
+        mode = str(items[1]).strip()
+        return {"type": "GUARD", "cond": cond, "mode": mode}
+
+    def match_arm(self, items):
+        """
+        Verpakt een enkele arm van het MATCH-blok (patroon + uit te voeren regels).
+        """
+        pattern = items[0]
+        body_lines = []
+
+        for item in items[1:]:
+            if item is None:
+                continue
+            item_str = str(item).strip()
+            if item_str in ("{", "}", "->") or not item_str:
+                continue
+            for line in item_str.splitlines():
+                l_clean = line.strip()
+                if l_clean and l_clean not in ("{", "}"):
+                    formatted = l_clean if (l_clean.startswith(";") or l_clean.endswith(":") or l_clean.startswith("    ")) else f"    {l_clean}"
+                    body_lines.append(formatted)
+
+        # Bepaal het type patroon van deze arm
+        if isinstance(pattern, dict) and pattern.get("type") == "GUARD":
+            return {"kind": "GUARD", "cond": pattern["cond"], "mode": pattern["mode"], "body": body_lines}
+        elif str(pattern).strip() == "DEFAULT":
+            return {"kind": "DEFAULT", "body": body_lines}
+        else:
+            return {"kind": "VALUE", "value": str(pattern).strip(), "body": body_lines}
+
+    def match_stmt(self, items):
+        """
+        ZScripting: MATCH [target] { arm1 arm2 ... [DEFAULT] }
+        Genereert een waterval van TSTE/TSTG/TSTZ instructies met unieke skip- en eindlabels.
+        """
+        match_id = self.loop_counter
+        self.loop_counter += 1
+        end_label = f"__MATCH_END_{match_id}"
+
+        target_arg = None
+        arms = []
+
+        for item in items:
+            if item is None:
+                continue
+            if isinstance(item, dict) and "kind" in item:
+                arms.append(item)
+            else:
+                s = str(item).strip()
+                if s not in ("MATCH", "{", "}") and s:
+                    target_arg = s
+
+        asm = [f"; --- MATCH STATEMENT START (ID: {match_id}) ---"]
+        arm_labels = [f"__MATCH_{match_id}_ARM_{i}" for i in range(len(arms))]
+
+        for i, arm in enumerate(arms):
+            if i > 0:
+                asm.append(f"{arm_labels[i]}:")
+
+            next_label = arm_labels[i + 1] if i + 1 < len(arms) else end_label
+            kind = arm["kind"]
+
+            if kind == "DEFAULT":
+                # Onvoorwaardelijke fallback: geen test of skip nodig
+                pass
+
+            elif kind == "VALUE":
+                if not target_arg:
+                    raise SyntaxError(
+                        f"[ZScript Compiler Error] MATCH arm '{arm['value']} ->' gebruikt een waarde, "
+                        f"maar er is geen target opgegeven achter MATCH!"
+                    )
+                asm.append(f"    TST {target_arg}, {arm['value']}")
+                asm.append(f"    JMPF {next_label}")
+
+            elif kind == "GUARD":
+                cond = arm["cond"]
+                mode = arm["mode"]
+                op = cond["op"]
+
+                # Genereer de juiste STERN test-instructie en bijbehorende sprong
+                if op == "ZERO":
+                    asm.append(f"    TSTZ {cond['reg']}")
+                    asm.append(f"    {'JMPF' if mode == 'TRUE' else 'JMPT'} {next_label}")
+                elif op == "==":
+                    asm.append(f"    TSTE {cond['arg1']}, {cond['arg2']}")
+                    asm.append(f"    {'JMPF' if mode == 'TRUE' else 'JMPT'} {next_label}")
+                # elif op == "!=":
+                #     # Bij != draaien we de spronglogica van TSTE om
+                #     asm.append(f"    TSTE {cond['arg1']}, {cond['arg2']}")
+                #     asm.append(f"    {'JMPT' if mode == 'TRUE' else 'JMPF'} {next_label}")
+                elif op == ">":
+                    asm.append(f"    TSTG {cond['arg1']}, {cond['arg2']}")
+                    asm.append(f"    {'JMPF' if mode == 'TRUE' else 'JMPT'} {next_label}")
+                # elif op == "<":
+                #     # A < B is gelijk aan B > A op de STERN-Z32
+                #     asm.append(f"    TSTG {cond['arg2']}, {cond['arg1']}")
+                #     asm.append(f"    {'JMPF' if mode == 'TRUE' else 'JMPT'} {next_label}")
+
+            # Voeg de code van deze arm toe
+            for line in arm["body"]:
+                asm.append(line)
+
+            # Spring naar het einde van het MATCH-blok (behalve als dit de allerlaatste arm is)
+            if i < len(arms) - 1:
+                asm.append(f"    JMP {end_label}")
+
+        asm.append(f"{end_label}:")
+        asm.append(f"; --- MATCH STATEMENT END ---")
+        return "\n".join(asm)
+
 
     ## WRITE en READ expansie
     def _generate_unique_label(self, prefix="_SKIP_READ"):
