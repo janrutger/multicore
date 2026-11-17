@@ -34,3 +34,9 @@ MACRO fmul_round(Rx, Ry, scale, half) {
     DIVI Rx, scale
 }
 
+MACRO fdiv_round(Rx, denominator, scale_val, half_val) {
+    MULI Rx, scale_val
+    ADDI Rx, half_val
+    DIV Rx, denominator
+}
+

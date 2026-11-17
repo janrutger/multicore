@@ -7,7 +7,7 @@ MAP {
     START main
 
     ; === CONSTANTEN & CONFIGURATIE ===
-    CONST NUM_BODIES 12          ; Aantal deeltjes in de simulatie
+    CONST NUM_BODIES  12         ; Aantal deeltjes in de simulatie
     CONST MAX_STEPS 2500         ; Totaal aantal simulatieframes
     CONST CENTER_X 320000        ; Schermmidden X (320 * 1000 Q1000)
     CONST CENTER_Y 240000        ; Schermmidden Y (240 * 1000 Q1000)

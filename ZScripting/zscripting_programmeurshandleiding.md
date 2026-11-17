@@ -422,7 +422,7 @@ Alle onderstaande mnemonics kunnen rechtstreeks in het `PROGRAM`-blok en binnen 
 | `LOCK` | `addr` | Atomaire test-and-set op mutex-adres `addr` (zet `SUCCES` bij winst) |
 | `UNLOCK` | `addr` | Geeft mutex-adres `addr` weer vrij |
 | `CPUID` | `Rx` | Laadt het ID van de huidige CPU in `Rx` |
-| `PID` | `Rx` | Laadt het proces-/context-ID in `Rx` |
+| `PID` | `Rx` | Laadt het ID van de Parent CPU in `Rx` |
 | `OUT` | `Rx, port` | Schrijft register `Rx` naar I/O-poort `port` |
 | `IN` | `Rx, port` | Leest I/O-poort `port` naar register `Rx` |
 | `IOSYNC` | — | Geeft een kloktik aan de I/O-controller |
