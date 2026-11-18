@@ -252,6 +252,47 @@ def _h_unlock(master_cpu, target, reg1, arg2):
     target.status = 1
     target.fsm_state = 'FETCH'
 
+def _h_lockp(master_cpu, target, reg1, arg2):
+    # Haal het werkelijke RAM-adres op uit de waarde van het opgegeven register (reg1)
+    core_id = target.registers[reg1]
+    if core_id is None or master_cpu.cores[core_id].coreStatus != 'VALID':
+        target.fsm_state = 'EXECUTE'  # Wacht tot de registerwaarde geldig is
+        return
+
+    target_addr = master_cpu.cores[core_id].value
+    
+    # Lees de huidige waarde van het element uit shared memory
+    current_val = master_cpu.memory.memRead(target_addr, master_cpu.ID)
+    if current_val == 0:
+        # Probeer atomair 1 te schrijven (Test-and-Set)
+        status = master_cpu.memory.memWrite(1, adres=target_addr, cpu_id=master_cpu.ID)
+        if status == "STALL":
+            target.fsm_state = 'EXECUTE'
+            return
+        target.status = 1  # Gelukt! Lock is verkregen (SUCCES = True)
+    else:
+        target.status = 0  # Bezet! Lock is al in gebruik door een andere kern (FAIL = True)
+        
+    target.fsm_state = 'FETCH'
+
+def _h_unlockp(master_cpu, target, reg1, arg2):
+    # Haal het RAM-adres op uit het register
+    core_id = target.registers[reg1]
+    if core_id is None or master_cpu.cores[core_id].coreStatus != 'VALID':
+        target.fsm_state = 'EXECUTE'
+        return
+
+    target_addr = master_cpu.cores[core_id].value
+    
+    # Zet het geheugenadres atomair weer op 0 (vrijgeven)
+    status = master_cpu.memory.memWrite(0, adres=target_addr, cpu_id=master_cpu.ID)
+    if status == "STALL":
+        target.fsm_state = 'EXECUTE'
+        return
+        
+    target.status = 1
+    target.fsm_state = 'FETCH'
+
 # --- MEMORY STORE HANDLERS ---
 def _h_sto(master_cpu, target, reg1, arg2):
     core_id = target.registers[reg1]
@@ -683,7 +724,7 @@ EXEC_DISPATCH = {
     # Control Flow & Branching
     Op.HALT: _h_halt,     Op.SUSPEND: _h_suspend, Op.JMP: _h_jmp,
     Op.JMPT: _h_jmpt,     Op.JMPF: _h_jmpf,     Op.SUCCES: _h_succes, Op.FAIL: _h_fail,
-    Op.LOCK: _h_lock,     Op.UNLOCK: _h_unlock,
+    Op.LOCK: _h_lock,     Op.UNLOCK: _h_unlock, Op.LOCKP:   _h_lockp, Op.UNLOCKP: _h_unlockp,
 
     # Threading, Multi-Core & Parallelism
     Op.CONTEXT: _h_context,   Op.RCONTEXT: _h_rcontext, Op.SYNC: _h_sync,

@@ -79,7 +79,7 @@ DICE_LOOP:
     LDI B, 0
     TSTE A, B             ; Oog 1?
     JMPF CHECK_TWO
-    ATOMIC lock1 {
+    ATOMIC [lock1] {
         LDM K count1
         INC K
         STO K count1
@@ -90,7 +90,7 @@ CHECK_TWO:
     LDI B, 1
     TSTE A, B             ; Oog 2?
     JMPF CHECK_THREE
-    ATOMIC lock2 {
+    ATOMIC [lock2] {
         LDM K count2
         INC K
         STO K count2
@@ -101,7 +101,7 @@ CHECK_THREE:
     LDI B, 2
     TSTE A, B             ; Oog 3?
     JMPF CHECK_FOUR
-    ATOMIC lock3 {
+    ATOMIC [lock3] {
         LDM K count3
         INC K
         STO K count3
@@ -112,7 +112,7 @@ CHECK_FOUR:
     LDI B, 3
     TSTE A, B             ; Oog 4?
     JMPF CHECK_FIVE
-    ATOMIC lock4 {
+    ATOMIC [lock4] {
         LDM K count4
         INC K
         STO K count4
@@ -123,7 +123,7 @@ CHECK_FIVE:
     LDI B, 4
     TSTE A, B             ; Oog 5?
     JMPF CHECK_SIX
-    ATOMIC lock5 {
+    ATOMIC [lock5] {
         LDM K count5
         INC K
         STO K count5
@@ -131,7 +131,7 @@ CHECK_FIVE:
     JMP NEXT_ROLL
 
 CHECK_SIX:                ; Oog 6
-    ATOMIC lock6 {
+    ATOMIC [lock6] {
         LDM K count6
         INC K
         STO K count6

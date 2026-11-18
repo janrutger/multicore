@@ -261,6 +261,10 @@ class ZScriptExpander(Transformer):
             return f"    {mnemonic} {', '.join(args)}"
         return f"    {mnemonic}"
 
+    def absolute_lock(self, items):
+        """Zet de absolute_lock tree node om naar een string zoals '[1024]' of '[MUTEX_LOCK]'."""
+        return str(items[0])
+
     def label_def(self, items):
         return f"\n{items[0]}:"
 
@@ -488,14 +492,52 @@ class ZScriptExpander(Transformer):
 
 
 
+    # def atomic_stmt(self, tree_or_list):
+    #     """
+    #     ZScripting: ATOMIC MUTEX_LOCK { code block }
+    #     Expandeert automatisch naar de low-level spin-loop, kritieke sectie en unlock.
+    #     """
+    #     children = tree_or_list.children if hasattr(tree_or_list, 'children') else tree_or_list
+        
+    #     mutex_arg = str(children[1]).strip()
+    #     body_items = children[2:] if len(children) > 2 else []
+
+    #     self.loop_counter += 1
+    #     atomic_id = self.loop_counter
+
+    #     acquire_label = f"__ATOMIC_ACQUIRE_{atomic_id}"
+    #     crit_label = f"__ATOMIC_CRIT_{atomic_id}"
+
+    #     asm_output = []
+    #     asm_output.append(f"; --- START ATOMIC BLOCK (ID: {atomic_id}) ---")
+    #     asm_output.append(f"{acquire_label}:")
+    #     asm_output.append(f"    LOCK {mutex_arg}")
+    #     asm_output.append(f"    SUCCES {crit_label}")
+    #     asm_output.append(f"    JMP {acquire_label}")
+    #     asm_output.append(f"{crit_label}:")
+
+    #     # Verwerk de instructies binnen het atomaire blok
+    #     for item in body_items:
+    #         if item is not None:
+    #             item_str = str(item).strip()
+    #             if item_str and item_str not in ("{", "}"):
+    #                 formatted = item_str if (item_str.startswith(";") or item_str.endswith(":") or item_str.startswith("    ")) else f"    {item_str}"
+    #                 asm_output.append(formatted)
+
+    #     asm_output.append(f"    UNLOCK {mutex_arg}")
+    #     asm_output.append(f"; --- END ATOMIC BLOCK ---")
+
+    #     return "\n".join(asm_output)
     def atomic_stmt(self, tree_or_list):
         """
-        ZScripting: ATOMIC MUTEX_LOCK { code block }
-        Expandeert automatisch naar de low-level spin-loop, kritieke sectie en unlock.
+        ZScripting: 
+          - ATOMIC MUTEX_LOCK { code block } -> Gebruikt LOCK / UNLOCK (absoluut adres/symbool)
+          - ATOMIC I { code block }          -> Gebruikt LOCKP / UNLOCKP (register-indirect)
         """
         children = tree_or_list.children if hasattr(tree_or_list, 'children') else tree_or_list
         
-        mutex_arg = str(children[1]).strip()
+        arg_node = children[1]
+        arg_str = str(arg_node).strip()
         body_items = children[2:] if len(children) > 2 else []
 
         self.loop_counter += 1
@@ -506,8 +548,21 @@ class ZScriptExpander(Transformer):
 
         asm_output = []
         asm_output.append(f"; --- START ATOMIC BLOCK (ID: {atomic_id}) ---")
+
+        # Bekende registers van de Stern-Z32 architectuur
+        registers = {"A", "B", "C", "K", "L", "M", "X", "Y", "Z", "I"}
+
+        if arg_str.upper() in registers:
+            # Het is een register -> gebruik LOCKP / UNLOCKP
+            lock_inst = f"LOCKP {arg_str}"
+            unlock_inst = f"UNLOCKP {arg_str}"
+        else:
+            # Het is een adres of symbool (bijv. 1024 of MUTEX_LOCK) -> gebruik LOCK / UNLOCK
+            lock_inst = f"LOCK {arg_str}"
+            unlock_inst = f"UNLOCK {arg_str}"
+
         asm_output.append(f"{acquire_label}:")
-        asm_output.append(f"    LOCK {mutex_arg}")
+        asm_output.append(f"    {lock_inst}")
         asm_output.append(f"    SUCCES {crit_label}")
         asm_output.append(f"    JMP {acquire_label}")
         asm_output.append(f"{crit_label}:")
@@ -520,11 +575,10 @@ class ZScriptExpander(Transformer):
                     formatted = item_str if (item_str.startswith(";") or item_str.endswith(":") or item_str.startswith("    ")) else f"    {item_str}"
                     asm_output.append(formatted)
 
-        asm_output.append(f"    UNLOCK {mutex_arg}")
+        asm_output.append(f"    {unlock_inst}")
         asm_output.append(f"; --- END ATOMIC BLOCK ---")
 
         return "\n".join(asm_output)
-
 
     # --- DE REPEAT GENERATOR ---
     def repeat_tail(self, items):

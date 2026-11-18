@@ -75,8 +75,6 @@ class Op(IntEnum):
     
 
     # --- FORMAT: ONE_REG ---
-    # PUSH  = 90
-    # POP   = 91
     # GPU   = 94
     # CALLS = 95
     INC   = 80     # Implemented
@@ -84,6 +82,8 @@ class Op(IntEnum):
     TSTZ  = 73     # Implemented
     CPUID = 96     # Implemented
     PID   = 94     # Implemented
+    LOCKP   = 90     # NEW: Register-indirect atomic lock via pointer
+    UNLOCKP = 91     # NEW: Register-indirect atomic unlock via pointer
 
     # --- CIU MAILBOX API (FORMAT: ONE_REG) ---
     MSG_DONE  = 85  # msg_done Ry      (Ry = TxSlotID)
@@ -98,7 +98,7 @@ FORMAT_ONE_ADDR    = {
     Op.SYNC, Op.ALLSYNC, Op.LOCK, Op.UNLOCK
 }
 FORMAT_ONE_REG     = {
-    Op.INC, Op.DEC, Op.TSTZ, Op.CPUID, Op.PID,
+    Op.INC, Op.DEC, Op.TSTZ, Op.CPUID, Op.PID, Op.LOCKP, Op.UNLOCKP,
     Op.MSG_DONE, Op.MSG_OPEN, Op.MSG_CLOSE, Op.MSG_PROBE
 }
 FORMAT_TWO_REG_REG = {
