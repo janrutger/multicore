@@ -252,7 +252,7 @@ class SternZ32Mainboard:
         print("\n==========================================================")
         print("          SHARED GEHEUGEN DUMP (Adres 1024 t/m 1033)      ")
         print("==========================================================")
-        for addr in range(1024, 1034):
+        for addr in range(1024, 1044):
             waarde = self.mmu.memRead(addr, cpu_id=0)
             print(f"Adres {addr:<4} | Waarde: {waarde:>10}")
         print("==========================================================\n")
