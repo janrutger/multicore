@@ -125,7 +125,7 @@ DICE_WORKER:
                     heap_read(K, 0, Z)
                     INC Z
                     Z -> [_dice_val]
-                    [_dice_val] -> Z
+                    ; [_dice_val] -> Z
                     heap_write(K, 0, Z)
                 }
             }
@@ -135,7 +135,7 @@ DICE_WORKER:
                     heap_read(K, 1, Z)
                     INC Z
                     Z -> [_dice_val]
-                    [_dice_val] -> Z
+                    ; [_dice_val] -> Z
                     heap_write(K, 1, Z)
                 }
             }
@@ -145,7 +145,7 @@ DICE_WORKER:
                     heap_read(K, 2, Z)
                     INC Z
                     Z -> [_dice_val]
-                    [_dice_val] -> Z
+                    ; [_dice_val] -> Z
                     heap_write(K, 2, Z)
                 }
             }
@@ -155,7 +155,7 @@ DICE_WORKER:
                     heap_read(K, 3, Z)
                     INC Z
                     Z -> [_dice_val]
-                    [_dice_val] -> Z
+                    ; [_dice_val] -> Z
                     heap_write(K, 3, Z)
                 }
             }
@@ -165,7 +165,7 @@ DICE_WORKER:
                     heap_read(K, 4, Z)
                     INC Z
                     Z -> [_dice_val]
-                    [_dice_val] -> Z
+                    ; [_dice_val] -> Z
                     heap_write(K, 4, Z)
                 }
             }
@@ -175,7 +175,7 @@ DICE_WORKER:
                     heap_read(K, 5, Z)
                     INC Z
                     Z -> [_dice_val]
-                    [_dice_val] -> Z
+                    ; [_dice_val] -> Z
                     heap_write(K, 5, Z)
                 }
             }

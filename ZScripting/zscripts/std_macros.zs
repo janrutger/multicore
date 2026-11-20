@@ -68,11 +68,13 @@ MACRO heap_init(heap_base, heap_size) {
 }
 
 MACRO malloc(rx) {
-    STO rx, _hp_req_size
+    ; STO rx, _hp_req_size
 
     _hp_lock:
         LOCK HEAP_BASE
         FAIL _hp_lock
+
+    STO rx, _hp_req_size
 
     ; scan_ptr = HEAP_BASE + 3
     LDI I, HEAP_BASE
@@ -203,6 +205,10 @@ MACRO heap_write(ptr_reg, idx_val, val_reg) {
 }
 
 MACRO free(ptr_reg) {
+    _fr_base:
+        LOCK HEAP_BASE
+        FAIL _fr_base
+
     _fr_lock:
         LOCKP ptr_reg
         FAIL _fr_lock
@@ -216,4 +222,6 @@ MACRO free(ptr_reg) {
     _fr_unlock:
         UNLOCKP ptr_reg
         FAIL _fr_unlock
+
+    UNLOCK HEAP_BASE
 }
